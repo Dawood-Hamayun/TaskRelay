@@ -1,256 +1,38 @@
+// frontend/src/app/projects/page.tsx - DYNAMIC VERSION
 'use client';
 
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { 
   Plus, 
   Search, 
   Filter, 
   MoreHorizontal,
   Calendar,
-  Users,
   CheckCircle2,
   Clock,
   AlertTriangle,
   FolderOpen,
   Star,
-  Archive
+  Archive,
+  Loader2
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
-
-// Types based on your Prisma schema
-interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  members: {
-    id: string;
-    role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
-    user: {
-      id: string;
-      name: string;
-      email: string;
-      avatar: string;
-      color: string;
-    };
-  }[];
-  tasks: {
-    total: number;
-    completed: number;
-    inProgress: number;
-    overdue: number;
-  };
-  meetings: {
-    id: string;
-    title: string;
-    datetime: string;
-  }[];
-  tags: {
-    id: string;
-    name: string;
-    color: string;
-  }[];
-  createdAt: string;
-  lastActivity: string;
-  status: 'active' | 'archived' | 'completed';
-}
-
-// Mock data with more neutral colors for dark mode
-const mockProjects: Project[] = [
-  {
-    id: '1',
-    name: 'Website Redesign',
-    description: 'Complete overhaul of the company website with modern design and improved UX',
-    members: [
-      {
-        id: 'm1',
-        role: 'OWNER',
-        user: {
-          id: 'u1',
-          name: 'John Doe',
-          email: 'john@company.com',
-          avatar: 'JD',
-          color: 'bg-zinc-600'
-        }
-      },
-      {
-        id: 'm2',
-        role: 'ADMIN',
-        user: {
-          id: 'u2',
-          name: 'Jane Smith',
-          email: 'jane@company.com',
-          avatar: 'JS',
-          color: 'bg-slate-600'
-        }
-      },
-      {
-        id: 'm3',
-        role: 'MEMBER',
-        user: {
-          id: 'u3',
-          name: 'Mike Wilson',
-          email: 'mike@company.com',
-          avatar: 'MW',
-          color: 'bg-gray-600'
-        }
-      }
-    ],
-    tasks: {
-      total: 15,
-      completed: 8,
-      inProgress: 5,
-      overdue: 2
-    },
-    meetings: [
-      {
-        id: 'meet1',
-        title: 'Design Review',
-        datetime: '2024-12-15T14:00:00Z'
-      }
-    ],
-    tags: [
-      { id: 't1', name: 'Frontend', color: 'neutral' },
-      { id: 't2', name: 'Design', color: 'neutral' }
-    ],
-    createdAt: '2024-11-01T10:00:00Z',
-    lastActivity: '2024-12-13T16:30:00Z',
-    status: 'active'
-  },
-  {
-    id: '2',
-    name: 'Performance Optimization',
-    description: 'Improve application performance and reduce load times',
-    members: [
-      {
-        id: 'm4',
-        role: 'OWNER',
-        user: {
-          id: 'u3',
-          name: 'Mike Wilson',
-          email: 'mike@company.com',
-          avatar: 'MW',
-          color: 'bg-gray-600'
-        }
-      },
-      {
-        id: 'm5',
-        role: 'MEMBER',
-        user: {
-          id: 'u4',
-          name: 'Sarah Davis',
-          email: 'sarah@company.com',
-          avatar: 'SD',
-          color: 'bg-stone-600'
-        }
-      }
-    ],
-    tasks: {
-      total: 8,
-      completed: 3,
-      inProgress: 4,
-      overdue: 1
-    },
-    meetings: [],
-    tags: [
-      { id: 't3', name: 'Backend', color: 'neutral' },
-      { id: 't4', name: 'Performance', color: 'neutral' }
-    ],
-    createdAt: '2024-10-15T09:00:00Z',
-    lastActivity: '2024-12-12T11:15:00Z',
-    status: 'active'
-  },
-  {
-    id: '3',
-    name: 'Design System',
-    description: 'Create a comprehensive design system and component library',
-    members: [
-      {
-        id: 'm6',
-        role: 'OWNER',
-        user: {
-          id: 'u4',
-          name: 'Sarah Davis',
-          email: 'sarah@company.com',
-          avatar: 'SD',
-          color: 'bg-stone-600'
-        }
-      },
-      {
-        id: 'm7',
-        role: 'MEMBER',
-        user: {
-          id: 'u1',
-          name: 'John Doe',
-          email: 'john@company.com',
-          avatar: 'JD',
-          color: 'bg-zinc-600'
-        }
-      }
-    ],
-    tasks: {
-      total: 12,
-      completed: 9,
-      inProgress: 2,
-      overdue: 0
-    },
-    meetings: [
-      {
-        id: 'meet2',
-        title: 'Component Review',
-        datetime: '2024-12-16T10:00:00Z'
-      }
-    ],
-    tags: [
-      { id: 't2', name: 'Design', color: 'neutral' },
-      { id: 't5', name: 'Components', color: 'neutral' }
-    ],
-    createdAt: '2024-09-20T14:00:00Z',
-    lastActivity: '2024-12-13T09:45:00Z',
-    status: 'active'
-  },
-  {
-    id: '4',
-    name: 'Team Management',
-    description: 'Establish processes and workflows for better team collaboration',
-    members: [
-      {
-        id: 'm8',
-        role: 'OWNER',
-        user: {
-          id: 'u2',
-          name: 'Jane Smith',
-          email: 'jane@company.com',
-          avatar: 'JS',
-          color: 'bg-slate-600'
-        }
-      }
-    ],
-    tasks: {
-      total: 6,
-      completed: 6,
-      inProgress: 0,
-      overdue: 0
-    },
-    meetings: [],
-    tags: [
-      { id: 't6', name: 'Process', color: 'neutral' }
-    ],
-    createdAt: '2024-08-10T16:00:00Z',
-    lastActivity: '2024-11-28T13:20:00Z',
-    status: 'completed'
-  }
-];
+import { useProjects, Project } from '@/hooks/useProjects';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 
 export default function ProjectsPage() {
   const [mounted, setMounted] = useState(false);
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'archived'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const { theme } = useTheme();
+  const { projects, isLoading, getUserRole, canManageProject, getProjectProgress } = useProjects();
+  const { user } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
@@ -261,6 +43,7 @@ export default function ProjectsPage() {
   }
 
   const isDark = theme === 'dark';
+  
   const filteredProjects = projects.filter(project => {
     const matchesFilter = filter === 'all' || project.status === filter;
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -274,10 +57,6 @@ export default function ProjectsPage() {
       day: 'numeric',
       year: 'numeric'
     });
-  };
-
-  const getProgressPercentage = (tasks: Project['tasks']) => {
-    return tasks.total > 0 ? Math.round((tasks.completed / tasks.total) * 100) : 0;
   };
 
   const getProgressColor = (percentage: number, isDark: boolean) => {
@@ -294,14 +73,25 @@ export default function ProjectsPage() {
     return 'bg-gray-400';
   };
 
+  const handleProjectClick = (projectId: string) => {
+    router.push(`/projects/${projectId}`);
+  };
+
+  const handleCreateProject = () => {
+    router.push('/create-project');
+  };
+
   const ProjectCard = ({ project }: { project: Project }) => {
-    const progress = getProgressPercentage(project.tasks);
-    const isOwner = project.members.some(member => 
-      member.role === 'OWNER' && member.user.name === 'John Doe' // Current user check
-    );
+    const progress = getProjectProgress(project);
+    const userRole = getUserRole(project, user?.userId || '');
+    const isOwner = userRole === 'OWNER';
+    const canManage = canManageProject(project, user?.userId || '');
 
     return (
-      <Card className={`group hover:shadow-lg transition-all duration-200 cursor-pointer border shadow-sm ${isDark ? 'glass-card' : 'bg-white border-border'}`}>
+      <Card 
+        className={`group hover:shadow-lg transition-all duration-200 cursor-pointer border shadow-sm ${isDark ? 'glass-card' : 'bg-white border-border'}`}
+        onClick={() => handleProjectClick(project.id)}
+      >
         <CardHeader className="pb-4">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
@@ -324,9 +114,19 @@ export default function ProjectsPage() {
             </div>
             <div className="flex items-center gap-1 ml-3">
               {isOwner && <Star className="w-4 h-4 text-amber-500" />}
-              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+              {canManage && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Handle project options
+                  }}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 
@@ -388,7 +188,7 @@ export default function ProjectsPage() {
                   <div
                     key={member.id}
                     className={`w-7 h-7 rounded-full ${member.user.color} flex items-center justify-center text-white text-xs font-semibold border-2 border-background shadow-sm`}
-                    title={member.user.name}
+                    title={`${member.user.name || member.user.email} (${member.role})`}
                   >
                     {member.user.avatar}
                   </div>
@@ -448,7 +248,10 @@ export default function ProjectsPage() {
               <Filter className="h-4 w-4" />
             </Button>
             
-            <Button className="gap-2 h-9 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+            <Button 
+              onClick={handleCreateProject}
+              className="gap-2 h-9 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+            >
               <Plus className="h-4 w-4" />
               New Project
             </Button>
@@ -463,7 +266,7 @@ export default function ProjectsPage() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Projects</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {filteredProjects.length} projects
+                  {isLoading ? 'Loading...' : `${filteredProjects.length} projects`}
                 </p>
               </div>
               
@@ -491,7 +294,14 @@ export default function ProjectsPage() {
 
           {/* Projects Grid */}
           <div className="p-6">
-            {filteredProjects.length > 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center space-y-4">
+                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto" />
+                  <p className="text-muted-foreground">Loading projects...</p>
+                </div>
+              </div>
+            ) : filteredProjects.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredProjects.map(project => (
                   <ProjectCard key={project.id} project={project} />
@@ -500,11 +310,16 @@ export default function ProjectsPage() {
             ) : (
               <div className="text-center py-12">
                 <FolderOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">No projects found</h3>
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  {searchQuery ? 'No projects found' : 'No projects yet'}
+                </h3>
                 <p className="text-muted-foreground mb-6">
                   {searchQuery ? 'Try adjusting your search terms' : 'Get started by creating your first project'}
                 </p>
-                <Button className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button 
+                  onClick={handleCreateProject}
+                  className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
                   <Plus className="h-4 w-4" />
                   Create Project
                 </Button>

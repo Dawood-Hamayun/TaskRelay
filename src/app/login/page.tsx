@@ -1,9 +1,10 @@
+// frontend/src/app/login/page.tsx - Fixed invite token handling
 'use client';
 
 import { useState, useEffect } from 'react';
 import API from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +18,10 @@ import {
   Mail, 
   Lock,
   Moon,
-  Sun
+  Sun,
+  Users,
+  CheckCircle,
+  Loader2
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -27,13 +31,50 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [inviteInfo, setInviteInfo] = useState<any>(null);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [autoAcceptedProject, setAutoAcceptedProject] = useState<any>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    const message = searchParams.get('message');
+    if (message) {
+      console.log('Success message:', message);
+    }
+
+    // ✅ FIXED: Get invite token from URL params
+    const inviteParam = searchParams.get('invite');
+    if (inviteParam) {
+      console.log('🎫 Login with invite token:', inviteParam);
+      setInviteToken(inviteParam);
+      
+      // Fetch invite info to show context
+      fetchInviteInfo(inviteParam);
+    }
+  }, [searchParams]);
+
+  const fetchInviteInfo = async (token: string) => {
+    try {
+      console.log('🔍 Fetching invite info for token:', token);
+      const res = await API.get(`/invites/${token}`);
+      console.log('📧 Invite info received:', res.data);
+      setInviteInfo(res.data);
+      
+      // Pre-fill email if invite has one
+      if (res.data.email) {
+        setEmail(res.data.email);
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch invite info:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,22 +82,45 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await API.post('/auth/login', { email, password });
-      const hasProject = await login(res.data.access_token);
+      console.log('🔑 Submitting login:', { 
+        email, 
+        hasInviteToken: !!inviteToken,
+        inviteToken 
+      });
 
-      if (hasProject) {
-        router.push('/tasks');
-      } else {
-        router.push('/create-project');
+      // ✅ FIXED: Build URL with invite token as query parameter
+      let url = '/auth/login';
+      if (inviteToken) {
+        url += `?inviteToken=${inviteToken}`;
       }
+      
+      const res = await API.post(url, { email, password });
+      console.log('✅ Login response:', res.data);
+
+      // Login with the token
+      await login(res.data.access_token);
+      
+      // Check if invite was auto-accepted
+      if (res.data.autoAcceptedProject) {
+        setAutoAcceptedProject(res.data.autoAcceptedProject);
+        setShowSuccessMessage(true);
+        
+        // Redirect to the project after showing success
+        setTimeout(() => {
+          router.push(`/projects/${res.data.autoAcceptedProject.id}`);
+        }, 2500);
+      } else {
+        // Normal login flow - redirect to dashboard
+        router.push('/dashboard');
+      }
+      
     } catch (error: any) {
+      console.error('❌ Login error:', error);
+      
       if (error.response?.status === 401) {
-        setError('Invalid email or password');
+        setError('Invalid email or password. Please try again.');
       } else if (error.response?.data?.message) {
-        setError(Array.isArray(error.response.data.message) 
-          ? error.response.data.message.join(', ')
-          : error.response.data.message
-        );
+        setError(error.response.data.message);
       } else {
         setError('Something went wrong. Please try again.');
       }
@@ -71,6 +135,57 @@ export default function LoginPage() {
 
   if (!mounted) {
     return null;
+  }
+
+  // Success message for auto-accepted invite
+  if (showSuccessMessage && autoAcceptedProject) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="w-full max-w-md space-y-8">
+          <div className="flex items-center justify-center gap-3">
+            <Image
+              src="/taskrelay.svg"
+              alt="TaskRelay"
+              width={32}
+              height={32}
+              className="w-8 h-8"
+            />
+            <span className="text-xl font-semibold text-foreground">TaskRelay</span>
+          </div>
+
+          <Card className="border border-border shadow-sm bg-card">
+            <CardContent className="p-8 text-center space-y-6">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              
+              <div className="space-y-2">
+                <h1 className="text-2xl font-bold text-card-foreground">Welcome back!</h1>
+                <p className="text-muted-foreground">
+                  You've successfully joined {autoAcceptedProject.name}.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center justify-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Joined {autoAcceptedProject.name}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Taking you to your project...
+                </p>
+                <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -88,8 +203,25 @@ export default function LoginPage() {
           <span className="text-xl font-semibold text-foreground">TaskRelay</span>
         </div>
 
+        {/* Invite Context */}
+        {inviteInfo && (
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Users className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  You're invited to join {inviteInfo.project.name}
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-200 mt-1">
+                  by {inviteInfo.inviter.name || inviteInfo.inviter.email}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Card className="border border-border shadow-sm bg-card relative">
-          {/* Theme Toggle - inside card top-right */}
+          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -99,12 +231,16 @@ export default function LoginPage() {
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           
-          <CardContent className="p-8">      
+          <CardContent className="p-8">
             <div className="space-y-8">
               {/* Header */}
               <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold text-card-foreground">Welcome back</h1>
-                <p className="text-muted-foreground">Sign in to continue to your workspace</p>
+                <h1 className="text-3xl font-bold text-card-foreground">
+                  {inviteInfo ? 'Sign in to accept invite' : 'Welcome back'}
+                </h1>
+                <p className="text-muted-foreground">
+                  {inviteInfo ? 'Sign in to join the project' : 'Sign in to your TaskRelay account'}
+                </p>
               </div>
 
               {/* Form */}
@@ -127,8 +263,9 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      disabled={loading}
+                      disabled={loading || (inviteInfo && !!email)}
                       className="h-12 pl-12 text-base bg-input border-border focus:border-ring focus:ring-1 focus:ring-ring transition-all duration-200"
+                      autoFocus={!inviteInfo || !email}
                     />
                   </div>
 
@@ -145,6 +282,7 @@ export default function LoginPage() {
                       required
                       disabled={loading}
                       className="h-12 pl-12 pr-12 text-base bg-input border-border focus:border-ring focus:ring-1 focus:ring-ring transition-all duration-200"
+                      autoFocus={inviteInfo && !!email}
                     />
                     <button
                       type="button"
@@ -156,16 +294,6 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Forgot Password */}
-                <div className="text-right">
-                  <Link 
-                    href="/forgot-password" 
-                    className="text-sm text-primary hover:text-primary/80 font-medium hover:underline transition-colors"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-
                 {/* Submit Button */}
                 <Button
                   type="submit"
@@ -175,12 +303,12 @@ export default function LoginPage() {
                   <span className="flex items-center justify-center gap-2">
                     {loading ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" />
                         Signing in...
                       </>
                     ) : (
                       <>
-                        Sign in
+                        {inviteInfo ? 'Sign in & Join Project' : 'Sign in'}
                         <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                       </>
                     )}
@@ -200,26 +328,18 @@ export default function LoginPage() {
 
               {/* Sign Up Link */}
               <div className="text-center">
-                <Link href="/signup">
+                <Link href={inviteToken ? `/signup?invite=${inviteToken}` : '/signup'}>
                   <Button 
                     variant="outline" 
                     className="w-full h-12 border-border text-card-foreground hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-200"
                   >
-                    Create new account
+                    Create an account
                   </Button>
                 </Link>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Terms */}
-        <p className="text-center text-xs text-muted-foreground leading-relaxed">
-          By signing in, you agree to our{' '}
-          <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
-          {' '}and{' '}
-          <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
-        </p>
       </div>
     </div>
   );

@@ -1,20 +1,33 @@
-// app/hooks/useAuth
-
+// frontend/src/hooks/useAuth.tsx - Simplified without invite handling
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
-import API from '@/lib/api'; // import your axios instance
+import { useQueryClient } from '@tanstack/react-query';
 
-const AuthContext = createContext<any>(null);
+interface User {
+  userId: string;
+  email: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  login: (newToken: string) => Promise<boolean>;
+  logout: () => void;
+  loading: boolean;
+  isAuthenticated: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [hasProject, setHasProject] = useState<boolean>(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const isTokenExpired = (token: string): boolean => {
     try {
@@ -27,30 +40,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const clearAuth = () => {
-    localStorage.removeItem('token');
+    console.log('🧹 Clearing authentication and cache');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+    }
+    
+    queryClient.clear();
     setToken(null);
     setUser(null);
-    setHasProject(false);
   };
 
   useEffect(() => {
     const loadAuth = async () => {
       try {
+        if (typeof window === 'undefined') return;
+        
         const storedToken = localStorage.getItem('token');
+        console.log('🔍 Loading auth, stored token exists:', !!storedToken);
 
-        if (storedToken && !isTokenExpired(storedToken)) {
-          setToken(storedToken);
-          const decoded: any = jwtDecode(storedToken);
-          setUser({ userId: decoded.sub, email: decoded.email });
-
-          // ✅ Fetch projects directly
-          const res = await API.get('/projects');
-          setHasProject(res.data.length > 0);
+        if (storedToken) {
+          if (!isTokenExpired(storedToken)) {
+            const decoded: any = jwtDecode(storedToken);
+            console.log('✅ Token valid, setting user:', decoded.email);
+            setToken(storedToken);
+            setUser({ userId: decoded.sub, email: decoded.email });
+          } else {
+            console.log('❌ Token expired, clearing auth');
+            clearAuth();
+          }
         } else {
-          clearAuth();
+          console.log('🔍 No stored token found');
+          queryClient.clear();
         }
       } catch (error) {
-        console.error('Error during auth loading', error);
+        console.error('❌ Error during auth loading:', error);
         clearAuth();
       } finally {
         setLoading(false);
@@ -58,47 +81,70 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     loadAuth();
-  }, []);
+  }, [queryClient]);
 
-const login = async (newToken: string) => {
-  try {
-    if (isTokenExpired(newToken)) throw new Error('Received expired token');
+  const login = async (newToken: string): Promise<boolean> => {
+    try {
+      console.log('🔐 Attempting login with new token');
+      
+      if (isTokenExpired(newToken)) {
+        throw new Error('Received expired token');
+      }
 
-    localStorage.setItem('token', newToken);
-    setToken(newToken);
-    const decoded: any = jwtDecode(newToken);
-    setUser({ userId: decoded.sub, email: decoded.email });
+      const decoded: any = jwtDecode(newToken);
+      console.log('✅ Login successful for user:', decoded.email);
 
-    const res = await API.get('/projects');
-    setHasProject(res.data.length > 0);
+      // Clear cache before setting new user to prevent stale data
+      queryClient.clear();
 
-    // ✅ After login, you can return whether project exists
-    return res.data.length > 0;
-  } catch (error) {
-    console.error('Error during login:', error);
-    clearAuth();
-    throw error;
-  }
-};
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', newToken);
+      }
+      
+      setToken(newToken);
+      setUser({ userId: decoded.sub, email: decoded.email });
+
+      return true;
+    } catch (error) {
+      console.error('❌ Error during login:', error);
+      clearAuth();
+      throw error;
+    }
+  };
 
   const logout = () => {
+    console.log('🚪 User logging out');
     clearAuth();
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pendingInvite');
+    }
     router.push('/login');
   };
 
+  const isAuthenticated = !!token && !!user;
+
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, hasProject }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
   return context;
 };

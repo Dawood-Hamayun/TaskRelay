@@ -69,26 +69,25 @@
 .dark {
   --background: #0a0a0a;
   --foreground: #fafafa;
-  --card: #171717;
+  --card: #1a1a1a;
   --card-foreground: #fafafa;
-  --popover: #171717;
+  --popover: #1a1a1a;
   --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #0a0a0a;
-  --secondary: #262626;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #2a2a2a;
   --secondary-foreground: #fafafa;
-  --muted: #262626;
+  --muted: #2a2a2a;
   --muted-foreground: #a1a1aa;
-  --accent: #262626;
+  --accent: #2a2a2a;
   --accent-foreground: #fafafa;
   --destructive: #dc2626;
   --destructive-foreground: #fafafa;
-  --border: #262626;
-  --input: #262626;
-  --ring: #d4d4d8;
+  --border: #333333;
+  --input: #2a2a2a;
+  --ring: #3b82f6;
   --radius: 0.5rem;
 }
-
 @layer base {
   * {
     @apply border-border;
@@ -103,12 +102,12 @@
 
 /* Glassmorphic effect for dark mode cards */
 .dark .glass-card {
-  background: rgba(23, 23, 23, 0.8);
+  background: rgba(26, 26, 26, 0.8);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(64, 64, 64, 0.3);
 }
 
-/* Better scrollbar for dark mode */
+/* Better scrollbar styling */
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
 }

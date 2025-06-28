@@ -1,4 +1,4 @@
-// hooks/useTasks.ts
+// frontend/src/hooks/useTasks.ts - Updated with better tag support
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -25,6 +25,7 @@ export const useTasks = (projectId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: (error) => {
       console.error('Failed to create task:', error);
@@ -36,8 +37,17 @@ export const useTasks = (projectId?: string) => {
       const res = await API.patch(`/tasks/${id}`, data);
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (updatedTask) => {
+      // Update the specific task in cache
+      queryClient.setQueryData(['tasks', projectId], (oldTasks: Task[] = []) => {
+        return oldTasks.map(task => 
+          task.id === updatedTask.id ? updatedTask : task
+        );
+      });
+      
+      // Also invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: (error) => {
       console.error('Failed to update task:', error);
@@ -50,6 +60,7 @@ export const useTasks = (projectId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: (error) => {
       console.error('Failed to delete task:', error);
@@ -87,3 +98,93 @@ export const useTasks = (projectId?: string) => {
     getTasksByStatus,
   };
 };
+
+// frontend/src/lib/api.ts - Updated API client
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+class APIClient {
+  private getHeaders() {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+  }
+
+  async get(endpoint: string) {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`GET ${endpoint} failed:`, errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return {
+      data: await response.json(),
+      status: response.status,
+    };
+  }
+
+  async post(endpoint: string, data: any) {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`POST ${endpoint} failed:`, errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return {
+      data: await response.json(),
+      status: response.status,
+    };
+  }
+
+  async patch(endpoint: string, data: any) {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`PATCH ${endpoint} failed:`, errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return {
+      data: await response.json(),
+      status: response.status,
+    };
+  }
+
+  async delete(endpoint: string) {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`DELETE ${endpoint} failed:`, errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return {
+      data: response.status === 204 ? null : await response.json(),
+      status: response.status,
+    };
+  }
+}
+
+const API = new APIClient();
+export default API;

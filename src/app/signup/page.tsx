@@ -1,9 +1,10 @@
+// frontend/src/app/signup/page.tsx - Fixed invite token handling
 'use client';
 
 import { useState, useEffect } from 'react';
 import API from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,10 @@ import {
   User,
   Check,
   Moon,
-  Sun
+  Sun,
+  CheckCircle,
+  Users,
+  Loader2
 } from 'lucide-react';
 
 export default function SignupPage() {
@@ -30,13 +34,46 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [inviteInfo, setInviteInfo] = useState<any>(null);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [autoAcceptedProject, setAutoAcceptedProject] = useState<any>(null);
+  
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    // ✅ FIXED: Get invite token from URL params
+    const inviteParam = searchParams.get('invite');
+    if (inviteParam) {
+      console.log('🎫 Signup with invite token:', inviteParam);
+      setInviteToken(inviteParam);
+      
+      // Fetch invite info to show context
+      fetchInviteInfo(inviteParam);
+    }
+  }, [searchParams]);
+
+  const fetchInviteInfo = async (token: string) => {
+    try {
+      console.log('🔍 Fetching invite info for token:', token);
+      const res = await API.get(`/invites/${token}`);
+      console.log('📧 Invite info received:', res.data);
+      setInviteInfo(res.data);
+      
+      // Pre-fill email if invite has one
+      if (res.data.email) {
+        setEmail(res.data.email);
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch invite info:', error);
+      setError('Failed to load invitation details. The invite may be invalid or expired.');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,10 +81,49 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const res = await API.post('/auth/signup', { email, password, name });
-      login(res.data.access_token);
-      router.push('/create-project');
+      console.log('📝 Submitting signup:', { 
+        email, 
+        name, 
+        hasInviteToken: !!inviteToken,
+        inviteToken 
+      });
+
+      // ✅ FIXED: Build URL with invite token as query parameter
+      let url = '/auth/signup';
+      if (inviteToken) {
+        url += `?inviteToken=${inviteToken}`;
+      }
+      
+      const res = await API.post(url, { email, password, name });
+      console.log('✅ Signup response:', res.data);
+
+      // If signup includes auto-login (has access_token), login immediately
+      if (res.data.access_token) {
+        await login(res.data.access_token);
+        
+        // Set success state with project info
+        setAutoAcceptedProject(res.data.autoAcceptedProject);
+        setSuccess(true);
+        
+        // Redirect based on whether they joined a project
+        setTimeout(() => {
+          if (res.data.autoAcceptedProject) {
+            router.push(`/projects/${res.data.autoAcceptedProject.id}`);
+          } else {
+            router.push('/dashboard');
+          }
+        }, 2500);
+      } else {
+        // Old flow - just show success and redirect to login
+        setSuccess(true);
+        setTimeout(() => {
+          router.push('/login?message=Account created successfully. Please log in.');
+        }, 2000);
+      }
+      
     } catch (error: any) {
+      console.error('❌ Signup error:', error);
+      
       if (error.response?.status === 409) {
         setError('Email already registered. Please use a different email or try logging in.');
       } else if (error.response?.data?.message) {
@@ -80,6 +156,67 @@ export default function SignupPage() {
     return null;
   }
 
+  // ✅ Enhanced success screen
+  if (success) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="w-full max-w-md space-y-8">
+          <div className="flex items-center justify-center gap-3">
+            <Image
+              src="/taskrelay.svg"
+              alt="TaskRelay"
+              width={32}
+              height={32}
+              className="w-8 h-8"
+            />
+            <span className="text-xl font-semibold text-foreground">TaskRelay</span>
+          </div>
+
+          <Card className="border border-border shadow-sm bg-card">
+            <CardContent className="p-8 text-center space-y-6">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              
+              <div className="space-y-2">
+                <h1 className="text-2xl font-bold text-card-foreground">
+                  {autoAcceptedProject ? 'Welcome to the team!' : 'Account Created!'}
+                </h1>
+                <p className="text-muted-foreground">
+                  {autoAcceptedProject 
+                    ? `Welcome to TaskRelay, ${name}! You've successfully joined ${autoAcceptedProject.name}.`
+                    : `Welcome to TaskRelay, ${name}! Your account has been created successfully.`
+                  }
+                </p>
+              </div>
+
+              {autoAcceptedProject && (
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-center justify-center gap-2">
+                    <Users className="w-5 h-5 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Joined {autoAcceptedProject.name}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {autoAcceptedProject 
+                    ? 'Taking you to your project...'
+                    : 'Taking you to your dashboard...'
+                  }
+                </p>
+                <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-8">
@@ -95,8 +232,25 @@ export default function SignupPage() {
           <span className="text-xl font-semibold text-foreground">TaskRelay</span>
         </div>
 
+        {/* Invite Context */}
+        {inviteInfo && (
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Users className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  You're invited to join {inviteInfo.project.name}
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-200 mt-1">
+                  by {inviteInfo.inviter.name || inviteInfo.inviter.email}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Card className="border border-border shadow-sm bg-card relative">
-          {/* Theme Toggle - inside card top-right */}
+          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -110,8 +264,15 @@ export default function SignupPage() {
             <div className="space-y-8">
               {/* Header */}
               <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold text-card-foreground">Create your account</h1>
-                <p className="text-muted-foreground">Start your journey with TaskRelay today</p>
+                <h1 className="text-3xl font-bold text-card-foreground">
+                  {inviteInfo ? 'Join the team' : 'Create your account'}
+                </h1>
+                <p className="text-muted-foreground">
+                  {inviteInfo 
+                    ? 'Create your account to accept the invitation'
+                    : 'Start your journey with TaskRelay today'
+                  }
+                </p>
               </div>
 
               {/* Form */}
@@ -135,6 +296,7 @@ export default function SignupPage() {
                       required
                       disabled={loading}
                       className="h-12 pl-12 text-base bg-input border-border focus:border-ring focus:ring-1 focus:ring-ring transition-all duration-200"
+                      autoFocus={!inviteInfo}
                     />
                   </div>
 
@@ -149,9 +311,15 @@ export default function SignupPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      disabled={loading}
+                      disabled={loading || (inviteInfo && !!email)}
                       className="h-12 pl-12 text-base bg-input border-border focus:border-ring focus:ring-1 focus:ring-ring transition-all duration-200"
+                      autoFocus={inviteInfo && !email}
                     />
+                    {inviteInfo && email && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <Check className="w-5 h-5 text-green-500" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Password Field */}
@@ -227,12 +395,12 @@ export default function SignupPage() {
                   <span className="flex items-center justify-center gap-2">
                     {loading ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" />
                         Creating account...
                       </>
                     ) : (
                       <>
-                        Create account
+                        {inviteInfo ? 'Create account & Join' : 'Create account'}
                         <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                       </>
                     )}
@@ -252,7 +420,7 @@ export default function SignupPage() {
 
               {/* Sign In Link */}
               <div className="text-center">
-                <Link href="/login">
+                <Link href={inviteToken ? `/login?invite=${inviteToken}` : '/login'}>
                   <Button 
                     variant="outline" 
                     className="w-full h-12 border-border text-card-foreground hover:bg-accent hover:text-accent-foreground font-semibold transition-all duration-200"
