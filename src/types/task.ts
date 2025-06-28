@@ -1,4 +1,4 @@
-// types/task.ts
+// frontend/src/types/task.ts
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE' | 'BACKLOG';
 
@@ -10,10 +10,14 @@ export interface User {
 
 export interface Member {
   id: string;
-  userId: string;
   user: User;
-  projectId: string;
-  role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+  role?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
 }
 
 export interface Tag {
@@ -24,6 +28,7 @@ export interface Tag {
 }
 
 export interface TaskTag {
+  id: string;
   taskId: string;
   tagId: string;
   tag: Tag;
@@ -32,51 +37,53 @@ export interface TaskTag {
 export interface Comment {
   id: string;
   content: string;
-  authorId: string;
+  createdAt: string;
+  updatedAt: string;
   author: User;
   taskId: string;
-  createdAt: string;
 }
 
 export interface Attachment {
   id: string;
-  url: string;
   fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  uploadedAt: string;
+  uploadedBy: User;
   taskId: string;
-  createdAt: string;
 }
 
 export interface Subtask {
   id: string;
-  taskId: string;
   title: string;
   completed: boolean;
-  assigneeId?: string | null;
-  assignee?: Member | null;
   createdAt: string;
+  updatedAt: string;
+  taskId: string;
+  assigneeId?: string;
+  assignee?: Member;
 }
 
 export interface Task {
   id: string;
-  projectId: string;
-  project: {
-    id: string;
-    name: string;
-  };
   title: string;
-  description: string;
+  description?: string;
   priority: TaskPriority;
   status: TaskStatus;
-  dueDate?: string | null;
-  assigneeId?: string | null;
-  assignee?: Member | null;
-  subtasks: Subtask[];
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  projectId: string;
+  assigneeId?: string;
+  assignee?: Member;
+  project: Project;
+  tags: TaskTag[];
   comments: Comment[];
   attachments: Attachment[];
-  tags: TaskTag[];
-  createdAt: string;
+  subtasks: Subtask[];
 }
 
+// DTOs
 export interface CreateTaskDto {
   title: string;
   description?: string;
@@ -94,15 +101,26 @@ export interface UpdateTaskDto {
   status?: TaskStatus;
   dueDate?: string;
   assigneeId?: string;
+  tags?: string[];
 }
 
 export interface CreateSubtaskDto {
   title: string;
   assigneeId?: string;
+  completed?: boolean;
 }
 
 export interface UpdateSubtaskDto {
   title?: string;
-  completed?: boolean;
   assigneeId?: string;
+  completed?: boolean;
+}
+
+export interface CreateCommentDto {
+  content: string;
+}
+
+export interface CreateTagDto {
+  name: string;
+  color: string;
 }

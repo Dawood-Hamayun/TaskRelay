@@ -1,7 +1,8 @@
-// frontend/src/hooks/useComments.tsx (Hardcoded for now)
+// frontend/src/hooks/useComments.tsx
 'use client';
 
-import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { Comment } from '@/types/task';
 
 interface CreateCommentData {
@@ -13,80 +14,73 @@ interface CreateCommentParams {
   data: CreateCommentData;
 }
 
-// Mock data for development
-const MOCK_COMMENTS: Record<string, Comment[]> = {
-  'task-1': [
-    {
-      id: 'comment-1',
-      content: 'This looks good! Just need to update the styling.',
-      author: {
-        id: 'user-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-      },
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    },
-    {
-      id: 'comment-2',
-      content: 'Agreed. I can work on the mobile responsiveness.',
-      author: {
-        id: 'user-2',
-        name: 'Jane Smith',
-        email: 'jane@example.com',
-      },
-      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-    },
-  ],
-  'task-2': [
-    {
-      id: 'comment-3',
-      content: 'The API integration is complete. Ready for testing.',
-      author: {
-        id: 'user-3',
-        name: 'Mike Johnson',
-        email: 'mike@example.com',
-      },
-      createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
-    },
-  ],
-};
-
 export function useComments(taskId?: string) {
-  const [comments, setComments] = useState<Comment[]>(
-    taskId ? MOCK_COMMENTS[taskId] || [] : []
-  );
-  const [isCreating, setIsCreating] = useState(false);
+  const queryClient = useQueryClient();
 
-  const createComment = async ({ taskId, data }: CreateCommentParams) => {
-    setIsCreating(true);
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const newComment: Comment = {
-      id: `comment-${Date.now()}`,
-      content: data.content,
-      author: {
-        id: 'current-user',
-        name: 'Current User',
-        email: 'current@example.com',
-      },
-      createdAt: new Date().toISOString(),
-    };
+  const {
+    data: comments = [],
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ['comments', taskId],
+    queryFn: async () => {
+      if (!taskId) return [];
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/comments/${taskId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error('Failed to fetch comments');
+      return response.json();
+    },
+    enabled: !!taskId,
+  });
 
-    setComments(prev => [newComment, ...prev]);
-    setIsCreating(false);
-    
-    return newComment;
-  };
+  const createCommentMutation = useMutation({
+    mutationFn: async ({ taskId, data }: CreateCommentParams) => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/comments/${taskId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to create comment');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to delete comment');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['comments', taskId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
 
   return {
     comments,
-    createComment,
-    isCreating,
-    isLoading: false,
-    error: null,
+    createComment: createCommentMutation.mutateAsync,
+    deleteComment: deleteCommentMutation.mutateAsync,
+    isCreating: createCommentMutation.isPending,
+    isDeleting: deleteCommentMutation.isPending,
+    isLoading,
+    error,
   };
 }
-
 

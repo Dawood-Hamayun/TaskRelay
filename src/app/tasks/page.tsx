@@ -5,73 +5,31 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { TaskDetailPanel } from '@/components/TaskDetailPanel';
+import { TaskCard } from '@/components/tasks/TaskCard'; // Fixed import path
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { 
   Plus, 
   Search, 
   Filter, 
-  MoreHorizontal,
-  Calendar,
-  User,
-  Clock,
-  AlertCircle,
-  ArrowUp,
-  ArrowDown,
-  Minus,
   LayoutGrid,
   List,
   ChevronDown,
-  Paperclip,
-  MessageSquare,
-  Circle,
   Loader2,
-  FolderOpen
+  FolderOpen,
+  AlertCircle
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { useTasks } from '@/hooks/useTasks';
-import { Task, TaskPriority, TaskStatus, CreateTaskDto } from '@/types/task';
-
 import { useProjects } from '@/hooks/useProjects';
+import { Task, TaskStatus, CreateTaskDto } from '@/types/task';
 
 const statusColumns = [
-  { id: 'TODO', title: 'To Do', color: 'status-todo', accent: 'bg-zinc-100 dark:bg-zinc-800', accentColor: 'bg-zinc-400 dark:bg-zinc-500' },
-  { id: 'IN_PROGRESS', title: 'In Progress', color: 'status-progress', accent: 'bg-blue-100 dark:bg-blue-900/20', accentColor: 'bg-blue-500' },
-  { id: 'IN_REVIEW', title: 'In Review', color: 'status-review', accent: 'bg-amber-100 dark:bg-amber-900/20', accentColor: 'bg-amber-500' },
-  { id: 'DONE', title: 'Done', color: 'status-done', accent: 'bg-emerald-100 dark:bg-emerald-900/20', accentColor: 'bg-emerald-500' }
+  { id: 'TODO', title: 'To Do', accent: 'bg-zinc-100 dark:bg-zinc-800', accentColor: 'bg-zinc-400 dark:bg-zinc-500' },
+  { id: 'IN_PROGRESS', title: 'In Progress', accent: 'bg-blue-100 dark:bg-blue-900/20', accentColor: 'bg-blue-500' },
+  { id: 'IN_REVIEW', title: 'In Review', accent: 'bg-amber-100 dark:bg-amber-900/20', accentColor: 'bg-amber-500' },
+  { id: 'DONE', title: 'Done', accent: 'bg-emerald-100 dark:bg-emerald-900/20', accentColor: 'bg-emerald-500' }
 ];
-
-const priorityConfig = {
-  LOW: { color: 'text-zinc-600 dark:text-zinc-400', dot: 'bg-zinc-400 dark:priority-low' },
-  MEDIUM: { color: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500 dark:priority-medium' },
-  HIGH: { color: 'text-orange-600 dark:text-orange-400', dot: 'bg-orange-500 dark:priority-high' },
-  CRITICAL: { color: 'text-red-600 dark:text-red-400', dot: 'bg-red-500 dark:priority-critical' }
-};
-
-const getTagClasses = (color: string, isDark: boolean) => {
-  if (isDark) {
-    const darkClasses = {
-      blue: 'tag-blue',
-      purple: 'tag-purple', 
-      emerald: 'tag-emerald',
-      red: 'tag-red',
-      amber: 'tag-amber',
-      orange: 'tag-orange'
-    };
-    return darkClasses[color as keyof typeof darkClasses] || 'bg-zinc-800 text-zinc-300 border-zinc-700';
-  }
-  
-  const lightClasses = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    red: 'bg-red-50 text-red-700 border-red-200',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200',
-    orange: 'bg-orange-50 text-orange-700 border-orange-200'
-  };
-  return lightClasses[color as keyof typeof lightClasses] || 'bg-gray-50 text-gray-700 border-gray-200';
-};
 
 export default function TasksPage() {
   const [mounted, setMounted] = useState(false);
@@ -79,7 +37,6 @@ export default function TasksPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [selectedTaskForSubtask, setSelectedTaskForSubtask] = useState<Task | null>(null);
   const { theme } = useTheme();
 
   // Get projects
@@ -99,10 +56,7 @@ export default function TasksPage() {
     error, 
     createTask,
     updateTask,
-    deleteTask,
-    createSubtasks,
     isCreating,
-    isUpdating 
   } = useTasks(selectedProjectId);
 
   useEffect(() => {
@@ -157,42 +111,14 @@ export default function TasksPage() {
     );
   }
 
-  const isDark = theme === 'dark';
-  
-  // Get current project
   const currentProject = projects.find(p => p.id === selectedProjectId);
-  
-  // Filter tasks - all tasks (no more filtering for subtasks since they're not separate cards)
   const filteredTasks = tasks;
-
-  // Derive selectedTask from tasks array
   const selectedTask = selectedTaskId ? tasks.find(task => task.id === selectedTaskId) || null : null;
 
   const tasksByStatus = statusColumns.reduce((acc, column) => {
     acc[column.id] = filteredTasks.filter(task => task.status === column.id as TaskStatus);
     return acc;
   }, {} as Record<string, Task[]>);
-
-  const isOverdue = (dueDate: string | null) => {
-    if (!dueDate) return false;
-    return new Date(dueDate) < new Date();
-  };
-
-  const formatDueDate = (dueDate: string | null) => {
-    if (!dueDate) return null;
-    const date = new Date(dueDate);
-    const today = new Date();
-    const diffTime = date.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Tomorrow';
-    if (diffDays === -1) return 'Yesterday';
-    if (diffDays < 0) return `${Math.abs(diffDays)}d ago`;
-    if (diffDays <= 7) return `${diffDays}d`;
-    
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
 
   const handleCreateTask = async (taskData: CreateTaskDto & { projectId: string }) => {
     try {
@@ -211,11 +137,6 @@ export default function TasksPage() {
       console.error('Failed to create task:', error);
       throw error;
     }
-  };
-
-  const handleCreateSubtask = (parentTask: Task) => {
-    setSelectedTaskForSubtask(parentTask);
-    setIsCreateModalOpen(true);
   };
 
   const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
@@ -237,15 +158,6 @@ export default function TasksPage() {
     }
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    try {
-      await deleteTask(taskId);
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-      throw error;
-    }
-  };
-
   const handleTaskClick = (task: Task) => {
     setSelectedTaskId(task.id);
   };
@@ -256,99 +168,6 @@ export default function TasksPage() {
 
   const handleCloseCreateModal = () => {
     setIsCreateModalOpen(false);
-    setSelectedTaskForSubtask(null);
-  };
-
-  const TaskCard = ({ task }: { task: Task }) => {
-    const priorityInfo = priorityConfig[task.priority];
-    const overdue = isOverdue(task.dueDate);
-    
-    return (
-      <Card 
-        className={`group hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer border shadow-sm ${isDark ? 'glass-card' : 'bg-white border-border'}`}
-        onClick={() => handleTaskClick(task)}
-      >
-        <CardContent className="p-4">
-          {/* Header with Priority Indicator */}
-          <div className="flex items-start gap-3 mb-3">
-            <div className={`w-1.5 h-1.5 rounded-full mt-2 ${priorityInfo.dot} shrink-0`} />
-            <div className="flex-1 min-w-0">
-              <h3 className="font-medium text-card-foreground text-sm leading-5 mb-1">
-                {task.title}
-              </h3>
-              {task.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 leading-4">
-                  {task.description}
-                </p>
-              )}
-            </div>
-            <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <MoreHorizontal className="h-3 w-3" />
-            </Button>
-          </div>
-
-          {/* Tags */}
-          {task.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {task.tags.map(({ tag }) => (
-                <span
-                  key={tag.id}
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getTagClasses(tag.color, isDark)}`}
-                >
-                  {tag.name}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {/* Subtask Progress */}
-              {task.subtasks && task.subtasks.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-primary rounded-full" />
-                  <span>{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length}</span>
-                </div>
-              )}
-
-              {/* Due Date */}
-              {task.dueDate && (
-                <div className={`flex items-center gap-1 ${overdue ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                  <Clock className="h-3 w-3" />
-                  <span className={overdue ? 'font-medium' : ''}>{formatDueDate(task.dueDate)}</span>
-                </div>
-              )}
-
-              {/* Activity indicators */}
-              {task.comments.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <MessageSquare className="h-3 w-3" />
-                  <span>{task.comments.length}</span>
-                </div>
-              )}
-              {task.attachments.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <Paperclip className="h-3 w-3" />
-                  <span>{task.attachments.length}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Assignee */}
-            {task.assignee ? (
-              <div className="w-6 h-6 rounded-full bg-zinc-600 flex items-center justify-center text-white text-xs font-semibold shadow-sm">
-                {task.assignee.user.name?.charAt(0) || task.assignee.user.email.charAt(0)}
-              </div>
-            ) : (
-              <div className="w-6 h-6 rounded-full border-2 border-dashed border-muted flex items-center justify-center">
-                <User className="h-3 w-3 text-muted-foreground" />
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
   };
 
   return (
@@ -449,11 +268,11 @@ export default function TasksPage() {
                       <div className="flex items-center justify-between mb-4 pb-3">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${column.accentColor}`} />
-                          <h3 className={`font-semibold text-sm ${column.color}`}>
+                          <h3 className="font-semibold text-sm text-foreground">
                             {column.title}
                           </h3>
                         </div>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${column.accent} ${column.color}`}>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${column.accent} text-muted-foreground`}>
                           {columnTasks.length}
                         </span>
                       </div>
@@ -461,7 +280,11 @@ export default function TasksPage() {
                       {/* Tasks */}
                       <div className="space-y-3">
                         {columnTasks.map(task => (
-                          <TaskCard key={task.id} task={task} />
+                          <TaskCard 
+                            key={task.id} 
+                            task={task} 
+                            onClick={handleTaskClick}
+                          />
                         ))}
                         
                         {/* Add Task Button */}
@@ -497,10 +320,10 @@ export default function TasksPage() {
                       {/* Section Header */}
                       <div className="flex items-center gap-3 pb-3 border-b border-border">
                         <div className={`w-2 h-2 rounded-full ${column.accentColor}`} />
-                        <h3 className={`font-semibold text-sm ${column.color}`}>
+                        <h3 className="font-semibold text-sm text-foreground">
                           {column.title}
                         </h3>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${column.accent} ${column.color}`}>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${column.accent} text-muted-foreground`}>
                           {tasks.length}
                         </span>
                       </div>
@@ -508,7 +331,11 @@ export default function TasksPage() {
                       {/* Tasks List */}
                       <div className="space-y-2">
                         {tasks.map(task => (
-                          <TaskCard key={task.id} task={task} />
+                          <TaskCard 
+                            key={task.id} 
+                            task={task} 
+                            onClick={handleTaskClick}
+                          />
                         ))}
                       </div>
                     </div>

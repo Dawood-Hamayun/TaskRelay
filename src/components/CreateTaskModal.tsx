@@ -1,4 +1,4 @@
-// components/CreateTaskModal.tsx
+// 6. frontend/src/components/CreateTaskModal.tsx - Add tag selection in advanced options
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,6 +23,7 @@ import {
   ChevronDown, ChevronRight, Loader2
 } from 'lucide-react';
 import { CreateTaskDto, TaskPriority, TaskStatus } from '@/types/task';
+import { TagSelector } from './TagSelector';
 
 const PRIORITY_OPTIONS = [
   { value: 'LOW' as TaskPriority, label: 'Low', icon: '🟢' },
@@ -39,7 +40,6 @@ const STATUS_OPTIONS = [
   { value: 'BACKLOG' as TaskStatus, label: 'Backlog' }
 ];
 
-// Hardcoded members for now - you can make this dynamic later
 const HARDCODED_MEMBERS = [
   { id: 'member-1', user: { id: 'user-1', name: 'John Doe', email: 'john@example.com' } },
   { id: 'member-2', user: { id: 'user-2', name: 'Jane Smith', email: 'jane@example.com' } },
@@ -52,7 +52,7 @@ interface CreateTaskModalProps {
   onClose: () => void;
   onSubmit: (taskData: CreateTaskDto & { projectId: string }) => Promise<void>;
   projectId: string;
-  projects: Array<{ id: string; name: string }>; // Add projects prop
+  projects: Array<{ id: string; name: string }>;
 }
 
 export function CreateTaskModal({ 
@@ -70,7 +70,6 @@ export function CreateTaskModal({
     status: 'TODO',
     assigneeId: undefined,
     dueDate: undefined,
-    parentTaskId: undefined,
     tags: [],
   });
 
@@ -78,7 +77,6 @@ export function CreateTaskModal({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -89,7 +87,6 @@ export function CreateTaskModal({
         status: 'TODO',
         assigneeId: undefined,
         dueDate: undefined,
-        parentTaskId: undefined,
         tags: [],
       });
       setErrors({});
@@ -100,13 +97,6 @@ export function CreateTaskModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🚀 CreateTaskModal - Form submitted with data:', {
-      formData,
-      projectId,
-      parentTask: parentTask?.title
-    });
-    
-    // Validation
     const newErrors: Record<string, string> = {};
     if (!formData.title.trim()) newErrors.title = 'Title is required';
     if (!formData.projectId) newErrors.project = 'Project is required';
@@ -125,11 +115,9 @@ export function CreateTaskModal({
           status: formData.status,
           assigneeId: formData.assigneeId === 'unassigned' ? undefined : formData.assigneeId,
           dueDate: formData.dueDate || undefined,
-          parentTaskId: formData.parentTaskId,
           tags: formData.tags || [],
         };
 
-        console.log('📤 Sending task data:', taskData);
         await onSubmit(taskData);
         handleClose();
       } catch (error) {
@@ -151,7 +139,6 @@ export function CreateTaskModal({
         status: 'TODO',
         assigneeId: undefined,
         dueDate: undefined,
-        parentTaskId: undefined,
         tags: [],
       });
       setErrors({});
@@ -164,6 +151,10 @@ export function CreateTaskModal({
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       handleSubmit(e);
     }
+  };
+
+  const handleTagsChange = (tagIds: string[]) => {
+    setFormData(prev => ({ ...prev, tags: tagIds }));
   };
 
   return (
@@ -267,27 +258,27 @@ export function CreateTaskModal({
                     </Select>
                   </div>
 
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-sm font-medium text-card-foreground">
-                    Status
-                  </label>
-                  <Select 
-                    value={formData.status} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as TaskStatus }))}
-                    disabled={isSubmitting}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map(status => (
-                        <SelectItem key={status.value} value={status.value}>
-                          {status.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-medium text-card-foreground">
+                      Status
+                    </label>
+                    <Select 
+                      value={formData.status} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as TaskStatus }))}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map(status => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {/* Assignee & Due Date Row */}
@@ -378,6 +369,25 @@ export function CreateTaskModal({
                       disabled={isSubmitting}
                     />
                   </div>
+                  
+                  {/* Tags */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-card-foreground">
+                      Tags
+                    </label>
+                    <div className="p-4 bg-muted/30 rounded-lg border">
+                      <TagSelector
+                        projectId={formData.projectId}
+                        selectedTags={formData.tags}
+                        onTagsChange={handleTagsChange}
+                      />
+                      {formData.tags.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-3">
+                          {formData.tags.length} tag{formData.tags.length !== 1 ? 's' : ''} selected
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -430,3 +440,4 @@ export function CreateTaskModal({
     </Dialog>
   );
 }
+  

@@ -1,104 +1,109 @@
-// frontend/src/hooks/useTags.tsx (Hardcoded for now)
+// frontend/src/hooks/useTags.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tag } from '@/types/task';
 
-// Mock data for development
-const MOCK_TAGS: Record<string, Tag[]> = {
-  'project-1': [
-    {
-      id: 'tag-1',
-      name: 'Frontend',
-      color: 'blue',
-    },
-    {
-      id: 'tag-2',
-      name: 'Backend',
-      color: 'emerald',
-    },
-    {
-      id: 'tag-3',
-      name: 'Bug',
-      color: 'red',
-    },
-    {
-      id: 'tag-4',
-      name: 'Feature',
-      color: 'purple',
-    },
-    {
-      id: 'tag-5',
-      name: 'Design',
-      color: 'amber',
-    },
-    {
-      id: 'tag-6',
-      name: 'Urgent',
-      color: 'orange',
-    },
-  ],
-  'project-2': [
-    {
-      id: 'tag-7',
-      name: 'API',
-      color: 'blue',
-    },
-    {
-      id: 'tag-8',
-      name: 'Database',
-      color: 'emerald',
-    },
-    {
-      id: 'tag-9',
-      name: 'Testing',
-      color: 'purple',
-    },
-  ],
-};
+interface CreateTagData {
+  name: string;
+  color: string;
+}
 
 export function useTags(projectId?: string) {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadTags = async () => {
-      setIsLoading(true);
+  const {
+    data: tags = [],
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ['tags', projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 200));
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tags/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
       
-      const projectTags = projectId ? MOCK_TAGS[projectId] || [] : [];
-      setTags(projectTags);
-      setIsLoading(false);
-    };
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Tags fetch error:', errorData);
+        throw new Error(`Failed to fetch tags: ${response.status} ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
+    enabled: !!projectId,
+  });
 
-    if (projectId) {
-      loadTags();
-    } else {
-      setTags([]);
-      setIsLoading(false);
-    }
-  }, [projectId]);
+  const createTagMutation = useMutation({
+    mutationFn: async (data: CreateTagData) => {
+      if (!projectId) throw new Error('Project ID is required');
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tags/${projectId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Tag creation error:', errorData);
+        throw new Error(`Failed to create tag: ${response.status} ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags', projectId] });
+    },
+    onError: (error) => {
+      console.error('Create tag mutation error:', error);
+    },
+  });
 
-  const createTag = async (data: { name: string; color: string }) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const newTag: Tag = {
-      id: `tag-${Date.now()}`,
-      name: data.name,
-      color: data.color,
-    };
-
-    setTags(prev => [...prev, newTag]);
-    return newTag;
-  };
+  const deleteTagMutation = useMutation({
+    mutationFn: async (tagId: string) => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tags/${tagId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Tag deletion error:', errorData);
+        throw new Error(`Failed to delete tag: ${response.status} ${response.statusText}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tags', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      }
+    },
+    onError: (error) => {
+      console.error('Delete tag mutation error:', error);
+    },
+  });
 
   return {
     tags,
-    createTag,
+    createTag: createTagMutation.mutateAsync,
+    deleteTag: deleteTagMutation.mutateAsync,
     isLoading,
-    error: null,
+    isCreating: createTagMutation.isPending,
+    isDeleting: deleteTagMutation.isPending,
+    error,
   };
 }

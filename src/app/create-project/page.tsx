@@ -1,27 +1,31 @@
+// frontend/src/app/create-project/page.tsx - FIXED (remove redirect check)
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useProjects } from '@/hooks/useProjects';
+import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useTheme } from 'next-themes';
 import Image from 'next/image';
-import { ArrowRight, Moon, Sun } from 'lucide-react';
+import { ArrowRight, Moon, Sun, Loader2 } from 'lucide-react';
 
 export default function CreateProjectPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const { createProject } = useProjects();
+  const { createProject, isCreating } = useProjects();
+  const { user } = useAuth();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // ✅ REMOVED: No more automatic redirect checks - let this page be accessible
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -30,13 +34,14 @@ export default function CreateProjectPage() {
     }
 
     setError('');
-    setLoading(true);
 
     try {
       console.log('Creating project with name:', name);
       await createProject({ name: name.trim() });
       console.log('Project created successfully');
-      router.push('/tasks');
+      
+      // ✅ Always redirect to dashboard after creation
+      router.push('/dashboard');
     } catch (error: any) {
       console.error('Error creating project:', error);
       
@@ -50,8 +55,6 @@ export default function CreateProjectPage() {
       } else {
         setError('Failed to create project. Please try again.');
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -85,7 +88,7 @@ export default function CreateProjectPage() {
         </div>
 
         <Card className="border border-border shadow-sm bg-card relative">
-          {/* Theme Toggle - inside card top-right */}
+          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -99,8 +102,10 @@ export default function CreateProjectPage() {
             <div className="space-y-8">
               {/* Header */}
               <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold text-card-foreground">Create your first project</h1>
-                <p className="text-muted-foreground">What would you like to work on?</p>
+                <h1 className="text-3xl font-bold text-card-foreground">Create a project</h1>
+                <p className="text-muted-foreground">
+                  Welcome {user?.email}! Let's create a new project.
+                </p>
               </div>
 
               {/* Form */}
@@ -116,20 +121,20 @@ export default function CreateProjectPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  disabled={loading}
+                  disabled={isCreating}
                   className="h-12 text-center text-lg bg-input border-border focus:border-ring focus:ring-1 focus:ring-ring transition-all duration-200"
                   autoFocus
                 />
 
                 <Button
                   onClick={handleCreate}
-                  disabled={loading || !name.trim()}
+                  disabled={isCreating || !name.trim()}
                   className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
                   <span className="flex items-center justify-center gap-2">
-                    {loading ? (
+                    {isCreating ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" />
                         Creating...
                       </>
                     ) : (

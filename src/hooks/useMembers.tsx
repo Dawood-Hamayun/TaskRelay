@@ -1,98 +1,124 @@
-// frontend/src/hooks/useMembers.tsx (Hardcoded for now)
+// frontend/src/hooks/useMembers.ts - Enhanced debugging version
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Member } from '@/types/task';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import API from '@/lib/api';
+import { useAuth } from './useAuth';
 
-// Mock data for development
-const MOCK_MEMBERS: Record<string, Member[]> = {
-  'project-1': [
-    {
-      id: 'member-1',
-      user: {
-        id: 'user-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-      },
-      role: 'OWNER',
-    },
-    {
-      id: 'member-2',
-      user: {
-        id: 'user-2',
-        name: 'Jane Smith',
-        email: 'jane@example.com',
-      },
-      role: 'ADMIN',
-    },
-    {
-      id: 'member-3',
-      user: {
-        id: 'user-3',
-        name: 'Mike Johnson',
-        email: 'mike@example.com',
-      },
-      role: 'MEMBER',
-    },
-    {
-      id: 'member-4',
-      user: {
-        id: 'user-4',
-        name: 'Sarah Wilson',
-        email: 'sarah@example.com',
-      },
-      role: 'MEMBER',
-    },
-  ],
-  'project-2': [
-    {
-      id: 'member-5',
-      user: {
-        id: 'user-5',
-        name: 'Alex Brown',
-        email: 'alex@example.com',
-      },
-      role: 'OWNER',
-    },
-    {
-      id: 'member-6',
-      user: {
-        id: 'user-6',
-        name: 'Emily Davis',
-        email: 'emily@example.com',
-      },
-      role: 'MEMBER',
-    },
-  ],
-};
+export const useMembers = (projectId: string) => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
-export function useMembers(projectId?: string) {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Update member role mutation
+  const updateMemberRoleMutation = useMutation({
+    mutationFn: async ({ memberId, role }: { memberId: string; role: string }) => {
+      console.log('👤 Starting member role update:', { 
+        memberId, 
+        role, 
+        projectId,
+        userId: user?.userId,
+        baseURL: API.defaults.baseURL
+      });
 
-  useEffect(() => {
-    const loadMembers = async () => {
-      setIsLoading(true);
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const projectMembers = projectId ? MOCK_MEMBERS[projectId] || [] : [];
-      setMembers(projectMembers);
-      setIsLoading(false);
-    };
+      try {
+        // Log the exact URL being called
+        const url = `/members/${memberId}/role`;
+        const fullUrl = `${API.defaults.baseURL}${url}`;
+        console.log('🔗 Making request to:', fullUrl);
 
-    if (projectId) {
-      loadMembers();
-    } else {
-      setMembers([]);
-      setIsLoading(false);
-    }
-  }, [projectId]);
+        const response = await API.put(url, { 
+          role,
+          projectId 
+        });
+        
+        console.log('✅ Member role update successful:', response.data);
+        return response.data;
+      } catch (error: any) {
+        console.error('❌ Member role update failed - Full error:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL,
+          fullURL: error.config?.baseURL + error.config?.url
+        });
+
+        // Check if it's a network error
+        if (!error.response) {
+          console.error('❌ Network error - server might be down');
+        }
+
+        throw error;
+      }
+    },
+    onSuccess: (data) => {
+      console.log('✅ Member role updated successfully, invalidating queries');
+      queryClient.invalidateQueries({ queryKey: ['projects', user?.userId] });
+    },
+    onError: (error: any) => {
+      console.error('❌ Mutation failed:', error);
+    },
+  });
+
+  // Remove member mutation
+  const removeMemberMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      console.log('🗑️ Starting member removal:', { 
+        memberId, 
+        projectId,
+        userId: user?.userId,
+        baseURL: API.defaults.baseURL
+      });
+
+      try {
+        const url = `/members/${memberId}?projectId=${projectId}`;
+        const fullUrl = `${API.defaults.baseURL}${url}`;
+        console.log('🔗 Making DELETE request to:', fullUrl);
+
+        const response = await API.delete(url);
+        
+        console.log('✅ Member removal successful:', response.data);
+        return memberId;
+      } catch (error: any) {
+        console.error('❌ Member removal failed - Full error:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL,
+          fullURL: error.config?.baseURL + error.config?.url
+        });
+
+        if (!error.response) {
+          console.error('❌ Network error - server might be down');
+        }
+
+        throw error;
+      }
+    },
+    onSuccess: (memberId) => {
+      console.log('✅ Member removed successfully, invalidating queries');
+      queryClient.invalidateQueries({ queryKey: ['projects', user?.userId] });
+    },
+    onError: (error: any) => {
+      console.error('❌ Remove mutation failed:', error);
+    },
+  });
 
   return {
-    members,
-    isLoading,
-    error: null,
+    updateMemberRole: (memberId: string, role: string) => 
+      updateMemberRoleMutation.mutateAsync({ memberId, role }),
+    isUpdating: updateMemberRoleMutation.isPending,
+    
+    removeMember: (memberId: string) => 
+      removeMemberMutation.mutateAsync(memberId),
+    isRemoving: removeMemberMutation.isPending,
   };
-}
+};
+

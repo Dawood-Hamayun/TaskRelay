@@ -1,4 +1,4 @@
-// components/TaskDetailPanel.tsx
+// frontend/src/components/TaskDetailPanel.tsx - COMPLETE VERSION
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,27 +15,30 @@ import {
 import { 
   X, Calendar, User, Tag, MessageSquare, Paperclip, Clock, 
   Edit3, Save, AlertCircle, ArrowUp, ArrowDown, Minus, Plus, 
-  CheckCircle2, Circle, Send, Trash2, MoreHorizontal
+  CheckCircle2, Circle, Send, Trash2, Loader2
 } from 'lucide-react';
-import { Task, TaskPriority, TaskStatus, Subtask, CreateSubtaskDto } from '@/types/task';
+import { Task, TaskPriority, TaskStatus } from '@/types/task';
 import { useSubtasks } from '@/hooks/useSubtasks';
+import { useComments } from '@/hooks/useComments';
+import { useTaskTags } from '@/hooks/useTaskTags';
+import { TagSelector } from '@/components/TagSelector';
+import { useTheme } from 'next-themes';
 
 const PRIORITY_CONFIG: Record<TaskPriority, { icon: React.ComponentType<any>; label: string; color: string; dot: string }> = {
-  LOW: { icon: ArrowDown, label: 'Low', color: 'text-slate-600', dot: 'bg-slate-400' },
-  MEDIUM: { icon: Minus, label: 'Medium', color: 'text-amber-600', dot: 'bg-amber-500' },
-  HIGH: { icon: ArrowUp, label: 'High', color: 'text-orange-600', dot: 'bg-orange-500' },
-  CRITICAL: { icon: AlertCircle, label: 'Critical', color: 'text-red-600', dot: 'bg-red-500' }
+  LOW: { icon: ArrowDown, label: 'Low', color: 'text-slate-600 dark:text-slate-400', dot: 'bg-slate-400 dark:bg-slate-500' },
+  MEDIUM: { icon: Minus, label: 'Medium', color: 'text-amber-600 dark:text-amber-400', dot: 'bg-amber-500 dark:bg-amber-600' },
+  HIGH: { icon: ArrowUp, label: 'High', color: 'text-orange-600 dark:text-orange-400', dot: 'bg-orange-500 dark:bg-orange-600' },
+  CRITICAL: { icon: AlertCircle, label: 'Critical', color: 'text-red-600 dark:text-red-400', dot: 'bg-red-500 dark:bg-red-600' }
 };
 
 const STATUS_OPTIONS = [
-  { value: 'TODO' as TaskStatus, label: 'To Do', color: 'text-slate-600' },
-  { value: 'IN_PROGRESS' as TaskStatus, label: 'In Progress', color: 'text-blue-600' },
-  { value: 'IN_REVIEW' as TaskStatus, label: 'In Review', color: 'text-amber-600' },
-  { value: 'DONE' as TaskStatus, label: 'Done', color: 'text-emerald-600' },
-  { value: 'BACKLOG' as TaskStatus, label: 'Backlog', color: 'text-gray-600' }
+  { value: 'TODO' as TaskStatus, label: 'To Do', color: 'text-slate-600 dark:text-slate-400' },
+  { value: 'IN_PROGRESS' as TaskStatus, label: 'In Progress', color: 'text-blue-600 dark:text-blue-400' },
+  { value: 'IN_REVIEW' as TaskStatus, label: 'In Review', color: 'text-amber-600 dark:text-amber-400' },
+  { value: 'DONE' as TaskStatus, label: 'Done', color: 'text-emerald-600 dark:text-emerald-400' },
+  { value: 'BACKLOG' as TaskStatus, label: 'Backlog', color: 'text-gray-600 dark:text-gray-400' }
 ];
 
-// Hardcoded members for now
 const HARDCODED_MEMBERS = [
   { id: 'member-1', user: { id: 'user-1', name: 'John Doe', email: 'john@example.com' } },
   { id: 'member-2', user: { id: 'user-2', name: 'Jane Smith', email: 'jane@example.com' } },
@@ -43,13 +46,13 @@ const HARDCODED_MEMBERS = [
   { id: 'member-4', user: { id: 'user-4', name: 'Sarah Davis', email: 'sarah@example.com' } },
 ];
 
-const TAG_COLORS: Record<string, string> = {
-  blue: 'bg-blue-50 text-blue-700 border-blue-200',
-  purple: 'bg-purple-50 text-purple-700 border-purple-200',
-  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  red: 'bg-red-50 text-red-700 border-red-200',
-  amber: 'bg-amber-50 text-amber-700 border-amber-200',
-  orange: 'bg-orange-50 text-orange-700 border-orange-200',
+const TAG_COLORS: Record<string, { light: string; dark: string }> = {
+  blue: { light: 'bg-blue-600 text-white border-blue-600', dark: 'bg-blue-500 text-white border-blue-500' },
+  purple: { light: 'bg-purple-600 text-white border-purple-600', dark: 'bg-purple-500 text-white border-purple-500' },
+  emerald: { light: 'bg-emerald-600 text-white border-emerald-600', dark: 'bg-emerald-500 text-white border-emerald-500' },
+  red: { light: 'bg-red-600 text-white border-red-600', dark: 'bg-red-500 text-white border-red-500' },
+  amber: { light: 'bg-amber-600 text-white border-amber-600', dark: 'bg-amber-500 text-white border-amber-500' },
+  orange: { light: 'bg-orange-600 text-white border-orange-600', dark: 'bg-orange-500 text-white border-orange-500' },
 };
 
 interface TaskDetailPanelProps {
@@ -71,6 +74,17 @@ export function TaskDetailPanel({
   const [isUpdating, setIsUpdating] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [selectedSubtaskAssignee, setSelectedSubtaskAssignee] = useState<string>('unassigned');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const { theme } = useTheme();
+
+  const { 
+    comments, 
+    createComment, 
+    deleteComment,
+    isCreating: isCreatingComment,
+    isDeleting: isDeletingComment
+  } = useComments(task?.id);
 
   const { 
     createSubtask,
@@ -81,6 +95,8 @@ export function TaskDetailPanel({
     isDeletingSubtask
   } = useSubtasks(task?.projectId);
 
+  const { updateTaskTags, isUpdating: isUpdatingTags } = useTaskTags();
+
   useEffect(() => {
     if (task) {
       setEditData({
@@ -88,13 +104,19 @@ export function TaskDetailPanel({
         description: task.description,
         priority: task.priority,
         status: task.status,
-        dueDate: task.dueDate,
+        dueDate: task.dueDate ? formatDateForInput(task.dueDate) : '',
         assigneeId: task.assigneeId,
       });
+      setSelectedTags(task.tags?.map(t => t.tag.id) || []);
     }
   }, [task]);
 
   if (!task) return null;
+
+  const formatDateForInput = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  };
 
   const handleSave = async () => {
     try {
@@ -114,21 +136,33 @@ export function TaskDetailPanel({
       description: task.description,
       priority: task.priority,
       status: task.status,
-      dueDate: task.dueDate,
+      dueDate: task.dueDate ? formatDateForInput(task.dueDate) : '',
       assigneeId: task.assigneeId,
     });
+    setSelectedTags(task.tags?.map(t => t.tag.id) || []);
     setIsEditing(false);
+    setIsEditingTags(false);
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !task) return;
     
     try {
-      // For now, just simulate adding a comment
-      console.log('Adding comment:', newComment);
+      await createComment({
+        taskId: task.id,
+        data: { content: newComment.trim() }
+      });
       setNewComment('');
     } catch (error) {
       console.error('Failed to add comment:', error);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      await deleteComment(commentId);
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
     }
   };
 
@@ -187,6 +221,12 @@ export function TaskDetailPanel({
     });
   };
 
+  const getTagClass = (color: string) => {
+    const colorConfig = TAG_COLORS[color];
+    if (!colorConfig) return TAG_COLORS.blue.light;
+    return theme === 'dark' ? colorConfig.dark : colorConfig.light;
+  };
+
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date();
   const priorityInfo = PRIORITY_CONFIG[task.priority];
   const PriorityIcon = priorityInfo.icon;
@@ -203,16 +243,16 @@ export function TaskDetailPanel({
 
       {/* Panel */}
       <div 
-        className={`fixed right-0 top-0 h-full w-[600px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out border-l border-gray-200 ${
+        className={`fixed right-0 top-0 h-full w-[600px] bg-card shadow-2xl z-50 transform transition-transform duration-300 ease-out border-l border-border ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-border bg-muted/30">
             <div className="flex items-center gap-3">
               <div className={`w-2 h-2 rounded-full ${priorityInfo.dot}`} />
-              <span className="text-sm font-medium text-gray-500">
+              <span className="text-sm font-medium text-muted-foreground">
                 {task.project.name}
               </span>
             </div>
@@ -264,11 +304,11 @@ export function TaskDetailPanel({
                   <Input
                     value={editData.title || ''}
                     onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
-                    className="text-xl font-semibold border-0 px-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-b-2 focus-visible:border-blue-500 focus-visible:rounded-none"
+                    className="text-xl font-semibold border-0 px-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-b-2 focus-visible:border-blue-500 focus-visible:rounded-none bg-transparent"
                     placeholder="Task title..."
                   />
                 ) : (
-                  <h1 className="text-xl font-semibold text-gray-900 leading-tight">
+                  <h1 className="text-xl font-semibold text-card-foreground leading-tight">
                     {task.title}
                   </h1>
                 )}
@@ -277,7 +317,7 @@ export function TaskDetailPanel({
               {/* Status and Priority */}
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-500">Status:</span>
+                  <span className="text-sm font-medium text-muted-foreground">Status:</span>
                   {isEditing ? (
                     <Select
                       value={editData.status || task.status}
@@ -302,7 +342,7 @@ export function TaskDetailPanel({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-500">Priority:</span>
+                  <span className="text-sm font-medium text-muted-foreground">Priority:</span>
                   {isEditing ? (
                     <Select
                       value={editData.priority || task.priority}
@@ -330,7 +370,7 @@ export function TaskDetailPanel({
 
               {/* Description */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-700">
+                <label className="text-sm font-medium text-card-foreground">
                   Description
                 </label>
                 {isEditing ? (
@@ -342,7 +382,7 @@ export function TaskDetailPanel({
                     className="resize-none"
                   />
                 ) : (
-                  <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-lg p-3">
+                  <p className="text-sm text-muted-foreground leading-relaxed bg-muted/50 rounded-lg p-3">
                     {task.description || 'No description provided.'}
                   </p>
                 )}
@@ -352,7 +392,7 @@ export function TaskDetailPanel({
               <div className="grid grid-cols-2 gap-6">
                 {/* Assignee */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-card-foreground">
                     Assignee
                   </label>
                   {isEditing ? (
@@ -369,7 +409,7 @@ export function TaskDetailPanel({
                       <SelectContent>
                         <SelectItem value="unassigned">
                           <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-gray-400" />
+                            <User className="h-4 w-4 text-muted-foreground" />
                             <span>Unassigned</span>
                           </div>
                         </SelectItem>
@@ -386,16 +426,16 @@ export function TaskDetailPanel({
                       </SelectContent>
                     </Select>
                   ) : task.assignee ? (
-                    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
                       <div className="w-6 h-6 rounded-full bg-zinc-600 flex items-center justify-center text-white text-xs font-semibold">
                         {task.assignee.user.name?.charAt(0) || task.assignee.user.email.charAt(0)}
                       </div>
-                      <span className="text-sm text-gray-900">
+                      <span className="text-sm text-card-foreground">
                         {task.assignee.user.name || task.assignee.user.email}
                       </span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 text-gray-500 p-2 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 text-muted-foreground p-2 bg-muted/50 rounded-lg">
                       <User className="h-4 w-4" />
                       <span className="text-sm">Unassigned</span>
                     </div>
@@ -404,7 +444,7 @@ export function TaskDetailPanel({
 
                 {/* Due Date */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-card-foreground">
                     Due Date
                   </label>
                   {isEditing ? (
@@ -415,8 +455,8 @@ export function TaskDetailPanel({
                       className="h-10"
                     />
                   ) : task.dueDate ? (
-                    <div className={`flex items-center gap-2 p-2 bg-gray-50 rounded-lg ${
-                      isOverdue ? 'text-red-600' : 'text-gray-600'
+                    <div className={`flex items-center gap-2 p-2 bg-muted/50 rounded-lg ${
+                      isOverdue ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
                     }`}>
                       <Clock className="h-4 w-4" />
                       <span className="text-sm">
@@ -425,17 +465,91 @@ export function TaskDetailPanel({
                       </span>
                     </div>
                   ) : (
-                    <div className="p-2 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-500">No due date</span>
+                    <div className="p-2 bg-muted/50 rounded-lg">
+                      <span className="text-sm text-muted-foreground">No due date</span>
                     </div>
                   )}
                 </div>
               </div>
 
+              {/* Tags Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-card-foreground">
+                    Tags ({task.tags?.length || 0})
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingTags(!isEditingTags)}
+                    className="h-6 text-xs"
+                  >
+                    <Edit3 className="h-3 w-3 mr-1" />
+                    {isEditingTags ? 'Cancel' : 'Edit'}
+                  </Button>
+                </div>
+
+                {isEditingTags ? (
+                  <div className="space-y-3">
+                    <TagSelector
+                      projectId={task.projectId}
+                      selectedTags={selectedTags}
+                      onTagsChange={setSelectedTags}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await updateTaskTags(task.id, selectedTags);
+                          setIsEditingTags(false);
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700"
+                        disabled={isUpdatingTags}
+                      >
+                        {isUpdatingTags ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          'Save Tags'
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedTags(task.tags?.map(t => t.tag.id) || []);
+                          setIsEditingTags(false);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {task.tags && task.tags.length > 0 ? (
+                      task.tags.map(({ tag }) => (
+                        <span
+                          key={tag.id}
+                          className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${getTagClass(tag.color)}`}
+                        >
+                          <Tag className="h-3 w-3 mr-1" />
+                          {tag.name}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No tags assigned</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Subtasks */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-card-foreground">
                     Subtasks ({task.subtasks?.length || 0})
                   </label>
                 </div>
@@ -463,7 +577,7 @@ export function TaskDetailPanel({
                     <SelectContent>
                       <SelectItem value="unassigned">
                         <div className="flex items-center gap-2">
-                          <User className="h-3 w-3 text-gray-400" />
+                          <User className="h-3 w-3 text-muted-foreground" />
                           <span className="text-xs">None</span>
                         </div>
                       </SelectItem>
@@ -486,7 +600,7 @@ export function TaskDetailPanel({
                     className="h-9"
                   >
                     {isCreatingSubtask ? (
-                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                      <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
                       <Plus className="h-3 w-3" />
                     )}
@@ -496,7 +610,7 @@ export function TaskDetailPanel({
                 {task.subtasks && task.subtasks.length > 0 ? (
                   <div className="space-y-2">
                     {task.subtasks.map(subtask => (
-                      <div key={subtask.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors">
+                      <div key={subtask.id} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg group hover:bg-muted/50 transition-colors">
                         <button
                           onClick={() => toggleSubtaskComplete(subtask.id, subtask.completed)}
                           className="shrink-0"
@@ -505,11 +619,11 @@ export function TaskDetailPanel({
                           {subtask.completed ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                           ) : (
-                            <Circle className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                            <Circle className="w-4 h-4 text-muted-foreground hover:text-card-foreground" />
                           )}
                         </button>
                         <span className={`flex-1 text-sm ${
-                          subtask.completed ? 'line-through text-gray-500' : 'text-gray-900'
+                          subtask.completed ? 'line-through text-muted-foreground' : 'text-card-foreground'
                         }`}>
                           {subtask.title}
                         </span>
@@ -532,13 +646,13 @@ export function TaskDetailPanel({
                     
                     {/* Progress Bar */}
                     <div className="mt-3">
-                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                         <span>Progress</span>
                         <span>
                           {Math.round((task.subtasks.filter(st => st.completed).length / task.subtasks.length) * 100)}%
                         </span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-muted rounded-full h-2">
                         <div 
                           className="bg-emerald-500 h-2 rounded-full transition-all duration-300" 
                           style={{ 
@@ -549,7 +663,7 @@ export function TaskDetailPanel({
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-gray-500">
+                  <div className="text-center py-6 text-muted-foreground">
                     <Circle className="w-6 h-6 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">No subtasks yet</p>
                     <p className="text-xs">Break this task into smaller pieces</p>
@@ -557,34 +671,12 @@ export function TaskDetailPanel({
                 )}
               </div>
 
-              {/* Tags */}
-              {task.tags?.length > 0 && (
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-gray-700">
-                    Tags
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {task.tags.map(({ tag }) => (
-                      <span
-                        key={tag.id}
-                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-                          TAG_COLORS[tag.color] || 'bg-gray-100 text-gray-700 border-gray-200'
-                        }`}
-                      >
-                        <Tag className="h-3 w-3 mr-1" />
-                        {tag.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Activity Stats */}
-              <div className="flex items-center gap-4 text-sm text-gray-500 p-3 bg-gray-50 rounded-lg">
-                {task.comments.length > 0 && (
+              <div className="flex items-center gap-4 text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg">
+                {comments.length > 0 && (
                   <div className="flex items-center gap-1">
                     <MessageSquare className="h-4 w-4" />
-                    <span>{task.comments.length} comments</span>
+                    <span>{comments.length} comments</span>
                   </div>
                 )}
                 {task.attachments?.length > 0 && (
@@ -593,42 +685,55 @@ export function TaskDetailPanel({
                     <span>{task.attachments.length} attachments</span>
                   </div>
                 )}
-                {task.comments.length === 0 && (!task.attachments || task.attachments.length === 0) && (
+                {comments.length === 0 && (!task.attachments || task.attachments.length === 0) && (
                   <span>No activity yet</span>
                 )}
               </div>
 
               {/* Comments Section */}
-              <div className="space-y-4 border-t pt-6">
-                <h3 className="font-medium text-gray-900">
-                  Comments ({task.comments.length})
+              <div className="space-y-4 border-t border-border pt-6">
+                <h3 className="font-medium text-card-foreground">
+                  Comments ({comments.length})
                 </h3>
                 
                 <div className="space-y-4">
-                  {task.comments.map(comment => (
-                    <div key={comment.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
+                  {comments.map(comment => (
+                    <div key={comment.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg group">
                       <div className="w-6 h-6 rounded-full bg-zinc-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
                         {comment.author.name?.charAt(0) || comment.author.email.charAt(0)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm font-medium text-card-foreground">
                             {comment.author.name || comment.author.email}
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             {formatDateTime(comment.createdAt)}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                           {comment.content}
                         </p>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleDeleteComment(comment.id)}
+                        disabled={isDeletingComment}
+                      >
+                        {isDeletingComment ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3 text-red-500" />
+                        )}
+                      </Button>
                     </div>
                   ))}
                 </div>
 
                 {/* Add Comment */}
-                <div className="space-y-3 pt-4 border-t">
+                <div className="space-y-3 pt-4 border-t border-border">
                   <div className="flex gap-3">
                     <Textarea
                       placeholder="Add a comment..."
@@ -639,10 +744,14 @@ export function TaskDetailPanel({
                     />
                     <Button 
                       onClick={handleAddComment}
-                      disabled={!newComment.trim()}
+                      disabled={!newComment.trim() || isCreatingComment}
                       className="bg-blue-600 hover:bg-blue-700 self-end"
                     >
-                      <Send className="w-4 h-4" />
+                      {isCreatingComment ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
