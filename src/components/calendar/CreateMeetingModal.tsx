@@ -18,6 +18,9 @@ interface CreateMeetingModalProps {
   defaultDate?: Date;
 }
 
+type MeetingPlatform = 'zoom' | 'meet' | 'teams';
+
+
 const MEETING_PLATFORMS = [
   { id: 'zoom', name: 'Zoom', icon: Video, urlPattern: 'https://zoom.us/j/' },
   { id: 'meet', name: 'Google Meet', icon: Video, urlPattern: 'https://meet.google.com/' },
@@ -160,19 +163,19 @@ export default function CreateMeetingModal({
     }));
   };
 
-  const generateMeetingUrl = (platform: string) => {
-    // Note: These are placeholder URLs for demo purposes
-    // In production, you'd integrate with actual platform APIs
-    const patterns = {
-      zoom: `https://zoom.us/j/demo-meeting-${Date.now()}`,
-      meet: `https://meet.google.com/demo-${Math.random().toString(36).substr(2, 10)}`,
-      teams: `https://teams.microsoft.com/l/meetup-join/demo-${Math.random().toString(36).substr(2, 20)}`
-    };
-    
-    if (patterns[platform]) {
-      setFormData(prev => ({ ...prev, meetingUrl: patterns[platform] }));
-    }
+  const generateMeetingUrl = (platform: MeetingPlatform) => {
+  // demo patterns (replace with real API calls in production)
+  const patterns: Record<MeetingPlatform, string> = {
+    zoom:  `https://zoom.us/j/demo-meeting-${Date.now()}`,
+    meet:  `https://meet.google.com/demo-${Math.random().toString(36).slice(2, 12)}`,
+    teams: `https://teams.microsoft.com/l/meetup-join/demo-${Math.random().toString(36).slice(2, 22)}`,
   };
+
+  setFormData(prev => ({
+    ...prev,
+    meetingUrl: patterns[platform],
+  }));
+};
 
   if (!isOpen) return null;
 
@@ -396,7 +399,7 @@ export default function CreateMeetingModal({
                     {selectedPlatform !== 'custom' && (
                       <button
                         type="button"
-                        onClick={() => generateMeetingUrl(selectedPlatform)}
+                        onClick={() => generateMeetingUrl(selectedPlatform as MeetingPlatform)}
                         className="px-4 h-12 bg-muted/50 text-muted-foreground rounded-xl hover:bg-muted transition-all text-sm"
                         title="Generate demo URL (replace with real meeting link)"
                       >

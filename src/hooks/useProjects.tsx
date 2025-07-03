@@ -28,6 +28,8 @@ export interface Project {
     inProgress: number;
     overdue: number;
     todo: number;
+    inReview?: number;   // <– add this
+
   };
   meetings: {
     id: string;

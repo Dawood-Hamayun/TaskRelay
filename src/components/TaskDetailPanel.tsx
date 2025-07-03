@@ -49,6 +49,16 @@ const TAG_COLORS: Record<string, { light: string; dark: string }> = {
   orange: { light: 'bg-orange-600 text-white border-orange-600', dark: 'bg-orange-500 text-white border-orange-500' },
 };
 
+interface CommentItem {
+  id: string;
+  content: string;
+  createdAt: string;
+  author: {
+    name?: string;
+    email: string;
+  };
+}
+
 interface TaskDetailPanelProps {
   task: Task | null;
   isOpen: boolean;
@@ -703,7 +713,7 @@ export function TaskDetailPanel({
                 </h3>
                 
                 <div className="space-y-4">
-                  {comments.map(comment => (
+                  {comments.map((comment: CommentItem) => (
                     <div key={comment.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg group">
                       <div className="w-6 h-6 rounded-full bg-zinc-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
                         {comment.author.name?.charAt(0) || comment.author.email.charAt(0)}

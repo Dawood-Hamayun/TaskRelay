@@ -2,7 +2,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import API from '@/lib/api';
+import apiClient from '@/lib/api';
 import { Task, CreateTaskDto, UpdateTaskDto } from '@/types/task';
 
 export const useTasks = (projectId?: string) => {
@@ -12,7 +12,7 @@ export const useTasks = (projectId?: string) => {
     queryKey: ['tasks', projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const res = await API.get(`/tasks/${projectId}`);
+      const res = await apiClient.get(`/tasks/${projectId}`);
       return res.data;
     },
     enabled: !!projectId,
@@ -20,7 +20,7 @@ export const useTasks = (projectId?: string) => {
 
   const createTaskMutation = useMutation({
     mutationFn: async ({ projectId, data }: { projectId: string; data: CreateTaskDto }) => {
-      const res = await API.post(`/tasks/${projectId}`, data);
+      const res = await apiClient.post(`/tasks/${projectId}`, data);
       return res.data;
     },
     onSuccess: () => {
@@ -34,7 +34,7 @@ export const useTasks = (projectId?: string) => {
 
   const updateTaskMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateTaskDto }) => {
-      const res = await API.patch(`/tasks/${id}`, data);
+      const res = await apiClient.patch(`/tasks/${id}`, data);
       return res.data;
     },
     onSuccess: (updatedTask) => {

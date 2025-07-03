@@ -8,20 +8,13 @@ import {
   Clock,
   Users,
   AlertTriangle,
-  Activity,
-  ArrowRight,
   Circle,
   Plus,
   Mail,
   Crown,
-  TrendingUp,
   Target,
-  Calendar,
-  Zap,
   Eye,
   PlayCircle,
-  PauseCircle,
-  Timer
 } from 'lucide-react';
 
 interface Task {
@@ -33,8 +26,8 @@ interface Task {
     user: {
       name?: string;
       email: string;
-      avatar: string;
-      color: string;
+      avatar?: string;   // ← make optional
+      color?: string;
     };
   };
 }
@@ -46,8 +39,8 @@ interface ProjectMember {
     id: string;
     name?: string;
     email: string;
-    avatar: string;
-    color: string;
+    avatar?: string;   // ← make optional
+    color?: string;
   };
 }
 
@@ -97,7 +90,7 @@ export function ProjectOverviewTab({
     if (diffInHours < 24) return `${diffInHours}h`;
     
     const diffInDays = Math.floor(diffInHours / 24);
-    if (diffDays < 7) return `${diffInDays}d`;
+      if (diffInDays < 7) return `${diffInDays}d`;
     
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };

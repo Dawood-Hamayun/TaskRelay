@@ -145,6 +145,7 @@ export default function ProjectDetailPage() {
     total: tasks.length,
     completed: tasks.filter(t => t.status === 'DONE').length,
     inProgress: tasks.filter(t => t.status === 'IN_PROGRESS').length,
+    inReview:   tasks.filter(t => t.status === 'IN_REVIEW').length,   // ✅ new line
     overdue: tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'DONE').length,
     todo: tasks.filter(t => t.status === 'TODO').length
   };

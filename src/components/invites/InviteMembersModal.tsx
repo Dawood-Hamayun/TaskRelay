@@ -20,6 +20,19 @@ interface InviteRow {
   isValid: boolean;
 }
 
+const getErrorMessage = (err: unknown): string => {
+  if (typeof err === 'string') return err;
+  if (err && typeof err === 'object') {
+    // axios-style error?
+    // eslint-disable-next-line  @typescript-eslint/no-explicit-any
+    const e = err as any;
+    return e.response?.data?.message ?? e.message ?? 'Unknown error';
+  }
+  return 'Unknown error';
+};
+
+
+
 export default function InviteMembersModal({ 
   isOpen, 
   onClose, 
@@ -120,8 +133,8 @@ export default function InviteMembersModal({
       const { results, errors: inviteErrors } = await createBatchInvites(inviteData);
       
       if (inviteErrors.length > 0) {
-        const errorMessages = inviteErrors.map(err => 
-          `Failed to invite ${err.email}: ${err.error?.response?.data?.message || 'Unknown error'}`
+        const errorMessages = inviteErrors.map(({ email, error }) =>
+          `Failed to invite ${email}: ${getErrorMessage(error)}`
         );
         setErrors(errorMessages);
       }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Task } from '@/types/task';
-import { UserAvatar } from '@/components/common/UserAvatar';
+import { UserAvatar } from '@/components/userAvatar';
 import { 
   MoreHorizontal, 
   Clock, 
@@ -14,6 +14,7 @@ import {
   Paperclip,
   Tag as TagIcon,
   Edit,
+  User,
   Trash2,
   Copy,
   Eye
@@ -27,6 +28,11 @@ interface TaskCardProps {
   onDelete?: (task: Task) => void;
   onDuplicate?: (task: Task) => void;
   className?: string;
+}
+
+export interface UserAvatarProps {
+  user: { id: string; name?: string; email: string; avatar?: string } | null;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 const priorityConfig = {
@@ -102,7 +108,7 @@ export function TaskCard({
   const { theme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isDark = theme === 'dark';
-  const overdue = isOverdue(task.dueDate);
+  const overdue = isOverdue(task.dueDate ?? null);
   const priorityInfo = priorityConfig[task.priority];
 
   // Calculate subtask progress
@@ -282,12 +288,16 @@ export function TaskCard({
             )}
           </div>
 
-          {/* Assignee */}
-          <UserAvatar 
-            user={task.assignee?.user} 
-            size="sm"
-          />
-        </div>
+          {/* Assignee */} 
+          {task.assignee?.user ? (
+            <UserAvatar user={task.assignee.user} size="sm" />
+          ) : (
+            /* small gray placeholder when there is no assignee */
+            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+              <User className="h-3 w-3 text-muted-foreground" />
+            </div>
+          )}
+         </div>
       </CardContent>
     </Card>
   );

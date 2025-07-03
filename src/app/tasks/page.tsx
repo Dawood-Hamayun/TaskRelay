@@ -716,11 +716,14 @@ export default function TasksPage() {
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-12">
                         <Checkbox
-                          checked={allSelected}
+                          checked={
+                            allSelected
+                              ? true                // every row selected
+                              : someSelected
+                              ? "indeterminate"     // some rows selected
+                              : false               // none selected
+                          }
                           onCheckedChange={handleSelectAll}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someSelected;
-                          }}
                         />
                       </TableHead>
                       <TableHead className="w-[300px]">
@@ -768,7 +771,7 @@ export default function TasksPage() {
                         const completedSubtasks = hasSubtasks ? task.subtasks.filter(st => st.completed).length : 0;
                         const totalSubtasks = hasSubtasks ? task.subtasks.length : 0;
                         const progressPercentage = hasSubtasks ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
-                        const overdue = isOverdue(task.dueDate);
+                        const overdue = isOverdue(task.dueDate ?? null);
 
                         return (
                           <TableRow 

@@ -144,9 +144,12 @@ export default function ProjectSettingsPage() {
     
     if (Object.keys(newErrors).length === 0) {
       try {
-        await updateProject(projectId, {
-          name: formData.name.trim(),
-          description: formData.description.trim() || undefined
+        await updateProject({
+          projectId,
+          data: {
+            name: formData.name.trim(),
+            description: formData.description.trim() || undefined,
+          },
         });
         setHasChanges(false);
       } catch (error) {
