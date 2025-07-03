@@ -2,11 +2,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Plus, Video, Users, Clock } from 'lucide-react';
 import { useMeetings } from '@/hooks/useMeetings';
 import { getCalendarDays, formatTime, isToday, isSameDay } from '@/utils/dateUtils';
 import { Meeting } from '@/types/meeting';
 import CreateMeetingModal from './CreateMeetingModal';
+import MeetingDetailModal from './MeetingDetailModal';
+import EditMeetingModal from './EditMeetingModal';
 
 interface CalendarViewProps {
   projectId?: string;
@@ -16,6 +18,8 @@ export default function CalendarView({ projectId }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   
   const { userMeetings, projectMeetings, isLoading } = useMeetings(projectId);
   
@@ -32,7 +36,7 @@ export default function CalendarView({ projectId }: CalendarViewProps) {
   const getMeetingsForDay = (date: Date): Meeting[] => {
     return meetings.filter(meeting => 
       isSameDay(new Date(meeting.datetime), date)
-    );
+    ).sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -48,12 +52,24 @@ export default function CalendarView({ projectId }: CalendarViewProps) {
   };
 
   const goToToday = () => {
-    setCurrentDate(new Date());
+    const today = new Date();
+    setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
+  };
+
+  const isViewingCurrentMonth = () => {
+    const today = new Date();
+    return currentDate.getMonth() === today.getMonth() && 
+           currentDate.getFullYear() === today.getFullYear();
   };
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
     setIsCreateModalOpen(true);
+  };
+
+  const handleMeetingClick = (meeting: Meeting, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setSelectedMeeting(meeting);
   };
 
   const isCurrentMonth = (date: Date) => {
@@ -73,28 +89,41 @@ export default function CalendarView({ projectId }: CalendarViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Calendar Header */}
+      {/* Modern Calendar Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-foreground">
-            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-          </h2>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <h2 className="text-3xl font-bold text-foreground tracking-tight">
+              {monthNames[currentDate.getMonth()]}
+            </h2>
+            <span className="text-2xl font-light text-muted-foreground">
+              {currentDate.getFullYear()}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
             <button
               onClick={() => navigateMonth('prev')}
-              className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-lg hover:bg-background hover:shadow-sm flex items-center justify-center transition-all duration-200"
+              title="Previous month"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={goToToday}
-              className="px-3 py-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                isViewingCurrentMonth()
+                  ? 'text-primary bg-primary/10' 
+                  : 'text-muted-foreground hover:text-primary hover:bg-background'
+              }`}
+              title="Go to current month"
             >
               Today
             </button>
             <button
               onClick={() => navigateMonth('next')}
-              className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-lg hover:bg-background hover:shadow-sm flex items-center justify-center transition-all duration-200"
+              title="Next month"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -103,21 +132,21 @@ export default function CalendarView({ projectId }: CalendarViewProps) {
         
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
         >
           <Plus className="w-4 h-4" />
           New Meeting
         </button>
       </div>
 
-      {/* Calendar Grid */}
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
+      {/* Enhanced Calendar Grid */}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
         {/* Day Names Header */}
-        <div className="grid grid-cols-7 border-b border-border">
+        <div className="grid grid-cols-7 border-b border-border bg-muted/30">
           {dayNames.map(day => (
             <div
               key={day}
-              className="p-3 text-center text-sm font-medium text-muted-foreground bg-muted/50"
+              className="p-4 text-center text-sm font-semibold text-muted-foreground"
             >
               {day}
             </div>
@@ -135,42 +164,60 @@ export default function CalendarView({ projectId }: CalendarViewProps) {
               <div
                 key={index}
                 onClick={() => handleDateClick(date)}
-                className={`min-h-[120px] p-2 border-r border-b border-border cursor-pointer hover:bg-accent/50 transition-colors ${
-                  !isCurrentMonth_ ? 'bg-muted/30 text-muted-foreground' : 'bg-card'
+                className={`min-h-[140px] p-3 border-r border-b border-border cursor-pointer hover:bg-accent/30 transition-all duration-200 ${
+                  !isCurrentMonth_ ? 'bg-muted/20 text-muted-foreground' : 'bg-card hover:shadow-sm'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <span
-                    className={`text-sm font-medium ${
+                    className={`text-sm font-semibold transition-all duration-200 ${
                       isToday_
-                        ? 'w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center'
+                        ? 'w-7 h-7 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs'
                         : isCurrentMonth_
-                        ? 'text-foreground'
+                        ? 'text-foreground hover:text-primary'
                         : 'text-muted-foreground'
                     }`}
                   >
                     {date.getDate()}
                   </span>
                   {dayMeetings.length > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      {dayMeetings.length}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {dayMeetings.length}
+                      </span>
+                    </div>
                   )}
                 </div>
                 
-                <div className="space-y-1">
-                  {dayMeetings.slice(0, 3).map(meeting => (
+                <div className="space-y-1.5">
+                  {dayMeetings.slice(0, 4).map(meeting => (
                     <div
                       key={meeting.id}
-                      className="text-xs p-1 bg-primary/10 text-primary rounded border-l-2 border-primary"
+                      onClick={(e) => handleMeetingClick(meeting, e)}
+                      className="group text-xs p-2 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 text-primary rounded-lg border border-primary/20 hover:border-primary/30 transition-all duration-200 cursor-pointer"
                     >
-                      <div className="font-medium truncate">{meeting.title}</div>
-                      <div className="text-primary/70">{formatTime(meeting.datetime)}</div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {meeting.meetingUrl && (
+                          <Video className="w-3 h-3 opacity-70 group-hover:opacity-100" />
+                        )}
+                        <div className="font-semibold truncate flex-1">{meeting.title}</div>
+                      </div>
+                      <div className="flex items-center justify-between text-primary/70 group-hover:text-primary/90">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatTime(meeting.datetime)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {meeting.attendees.length}
+                        </span>
+                      </div>
                     </div>
                   ))}
-                  {dayMeetings.length > 3 && (
-                    <div className="text-xs text-muted-foreground">
-                      +{dayMeetings.length - 3} more
+                  {dayMeetings.length > 4 && (
+                    <div className="text-xs text-muted-foreground font-medium text-center py-1 bg-muted/50 rounded-md">
+                      +{dayMeetings.length - 4} more
                     </div>
                   )}
                 </div>
@@ -179,6 +226,20 @@ export default function CalendarView({ projectId }: CalendarViewProps) {
           })}
         </div>
       </div>
+
+      {/* Meeting Detail Modal */}
+      <MeetingDetailModal
+        meeting={selectedMeeting}
+        isOpen={!!selectedMeeting}
+        onClose={() => setSelectedMeeting(null)}
+        onEdit={setEditingMeeting}
+      />
+
+      <EditMeetingModal
+        meeting={editingMeeting}
+        isOpen={!!editingMeeting}
+        onClose={() => setEditingMeeting(null)}
+      />
 
       {/* Create Meeting Modal */}
       <CreateMeetingModal

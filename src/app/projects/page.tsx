@@ -1,38 +1,30 @@
-// frontend/src/app/projects/page.tsx - DYNAMIC VERSION
+// frontend/src/app/projects/page.tsx - Updated with Project Modal
 'use client';
 
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { ProjectCard } from '@/components/project/ProjectCard';
+import { CreateProjectModal } from '@/components/project/CreateProjectModal';
+import { ProjectGuardWrapper } from '@/components/project/ProjectGuardWrapper';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { 
   Plus, 
   Search, 
   Filter, 
-  MoreHorizontal,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
   FolderOpen,
-  Star,
-  Archive,
   Loader2
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useTheme } from 'next-themes';
-import { useProjects, Project } from '@/hooks/useProjects';
-import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { useProjects } from '@/hooks/useProjects';
 
-export default function ProjectsPage() {
+function ProjectsContent() {
   const [mounted, setMounted] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'archived'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const { theme } = useTheme();
-  const { projects, isLoading, getUserRole, canManageProject, getProjectProgress } = useProjects();
-  const { user } = useAuth();
-  const router = useRouter();
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  
+  const { projects, isLoading } = useProjects();
 
   useEffect(() => {
     setMounted(true);
@@ -41,8 +33,6 @@ export default function ProjectsPage() {
   if (!mounted) {
     return null;
   }
-
-  const isDark = theme === 'dark';
   
   const filteredProjects = projects.filter(project => {
     const matchesFilter = filter === 'all' || project.status === filter;
@@ -50,180 +40,6 @@ export default function ProjectsPage() {
                          project.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const getProgressColor = (percentage: number, isDark: boolean) => {
-    if (isDark) {
-      if (percentage >= 80) return 'bg-emerald-500';
-      if (percentage >= 60) return 'bg-blue-500';
-      if (percentage >= 40) return 'bg-amber-500';
-      return 'bg-zinc-500';
-    }
-    
-    if (percentage >= 80) return 'bg-emerald-500';
-    if (percentage >= 60) return 'bg-blue-500';
-    if (percentage >= 40) return 'bg-amber-500';
-    return 'bg-gray-400';
-  };
-
-  const handleProjectClick = (projectId: string) => {
-    router.push(`/projects/${projectId}`);
-  };
-
-  const handleCreateProject = () => {
-    router.push('/create-project');
-  };
-
-  const ProjectCard = ({ project }: { project: Project }) => {
-    const progress = getProjectProgress(project);
-    const userRole = getUserRole(project, user?.userId || '');
-    const isOwner = userRole === 'OWNER';
-    const canManage = canManageProject(project, user?.userId || '');
-
-    return (
-      <Card 
-        className={`group hover:shadow-lg transition-all duration-200 cursor-pointer border shadow-sm ${isDark ? 'glass-card' : 'bg-white border-border'}`}
-        onClick={() => handleProjectClick(project.id)}
-      >
-        <CardHeader className="pb-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-semibold text-lg text-card-foreground group-hover:text-primary transition-colors line-clamp-1">
-                  {project.name}
-                </h3>
-                {project.status === 'completed' && (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                )}
-                {project.status === 'archived' && (
-                  <Archive className="w-5 h-5 text-muted-foreground shrink-0" />
-                )}
-              </div>
-              {project.description && (
-                <p className="text-sm text-muted-foreground line-clamp-2 leading-5">
-                  {project.description}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-1 ml-3">
-              {isOwner && <Star className="w-4 h-4 text-amber-500" />}
-              {canManage && (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Handle project options
-                  }}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Tags */}
-          {project.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {project.tags.slice(0, 3).map(tag => (
-                <span
-                  key={tag.id}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground"
-                >
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground mr-1" />
-                  {tag.name}
-                </span>
-              ))}
-              {project.tags.length > 3 && (
-                <span className="text-xs text-muted-foreground">+{project.tags.length - 3} more</span>
-              )}
-            </div>
-          )}
-        </CardHeader>
-
-        <CardContent className="pt-0 space-y-4">
-          {/* Progress */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium text-card-foreground">{progress}%</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div 
-                className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(progress, isDark)}`}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="text-lg font-semibold text-card-foreground">{project.tasks.total}</div>
-              <div className="text-xs text-muted-foreground">Total Tasks</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">{project.tasks.completed}</div>
-              <div className="text-xs text-muted-foreground">Completed</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-primary">{project.tasks.inProgress}</div>
-              <div className="text-xs text-muted-foreground">In Progress</div>
-            </div>
-          </div>
-
-          {/* Team & Meta */}
-          <div className="flex items-center justify-between pt-2 border-t border-border">
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                {project.members.slice(0, 4).map(member => (
-                  <div
-                    key={member.id}
-                    className={`w-7 h-7 rounded-full ${member.user.color} flex items-center justify-center text-white text-xs font-semibold border-2 border-background shadow-sm`}
-                    title={`${member.user.name || member.user.email} (${member.role})`}
-                  >
-                    {member.user.avatar}
-                  </div>
-                ))}
-                {project.members.length > 4 && (
-                  <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xs font-semibold border-2 border-background shadow-sm">
-                    +{project.members.length - 4}
-                  </div>
-                )}
-              </div>
-              <span className="text-xs text-muted-foreground ml-1">
-                {project.members.length} member{project.members.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {project.tasks.overdue > 0 && (
-                <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                  <AlertTriangle className="w-3 h-3" />
-                  {project.tasks.overdue}
-                </div>
-              )}
-              {project.meetings.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {project.meetings.length}
-                </div>
-              )}
-              <span>{formatDate(project.lastActivity)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
 
   return (
     <div className="flex h-screen bg-background">
@@ -235,12 +51,11 @@ export default function ProjectsPage() {
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
+              <Input
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 pl-10 pr-4 text-sm bg-card border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring w-64"
+                className="pl-9 h-9 w-64"
               />
             </div>
             
@@ -249,7 +64,7 @@ export default function ProjectsPage() {
             </Button>
             
             <Button 
-              onClick={handleCreateProject}
+              onClick={() => setIsCreateProjectModalOpen(true)}
               className="gap-2 h-9 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
             >
               <Plus className="h-4 w-4" />
@@ -261,7 +76,7 @@ export default function ProjectsPage() {
         {/* Main Content */}
         <main className="flex-1 overflow-auto">
           {/* Page Header */}
-          <div className="px-6 py-6 border-b border-border">
+          <div className="px-6 py-6">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Projects</h1>
@@ -317,7 +132,7 @@ export default function ProjectsPage() {
                   {searchQuery ? 'Try adjusting your search terms' : 'Get started by creating your first project'}
                 </p>
                 <Button 
-                  onClick={handleCreateProject}
+                  onClick={() => setIsCreateProjectModalOpen(true)}
                   className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Plus className="h-4 w-4" />
@@ -327,7 +142,24 @@ export default function ProjectsPage() {
             )}
           </div>
         </main>
+
+        {/* Create Project Modal */}
+        <CreateProjectModal
+          isOpen={isCreateProjectModalOpen}
+          onClose={() => setIsCreateProjectModalOpen(false)}
+          onSuccess={() => {
+            setIsCreateProjectModalOpen(false);
+          }}
+        />
       </div>
     </div>
+  );
+}
+
+export default function ProjectsPage() {
+  return (
+    <ProjectGuardWrapper requireProject={false}>
+      <ProjectsContent />
+    </ProjectGuardWrapper>
   );
 }

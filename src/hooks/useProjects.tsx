@@ -1,4 +1,4 @@
-// frontend/src/hooks/useProjects.ts - FIXED with user-specific cache
+// frontend/src/hooks/useProjects.ts - Fixed with proper avatar types
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,12 +13,13 @@ export interface Project {
     id: string;
     userId: string;
     role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+    createdAt: string;
     user: {
       id: string;
       name?: string;
       email: string;
-      avatar: string;
-      color: string;
+      avatar?: string; // Make avatar optional
+      color?: string;  // Make color optional
     };
   }[];
   tasks: {
@@ -51,7 +52,7 @@ export const useProjects = () => {
   const queryClient = useQueryClient();
   const { user, isAuthenticated } = useAuth();
 
-  // ✅ FIXED: Make query key user-specific to prevent cross-user cache pollution
+  // User-specific query key to prevent cross-user cache pollution
   const queryKey = ['projects', user?.userId];
 
   const { 
@@ -69,7 +70,18 @@ export const useProjects = () => {
           count: res.data?.length || 0,
           isArray: Array.isArray(res.data),
           userEmail: user?.email,
-          userId: user?.userId
+          userId: user?.userId,
+          firstProject: res.data?.[0] ? {
+            id: res.data[0].id,
+            name: res.data[0].name,
+            membersCount: res.data[0].members?.length || 0,
+            firstMember: res.data[0].members?.[0] ? {
+              id: res.data[0].members[0].user.id,
+              email: res.data[0].members[0].user.email,
+              hasAvatar: !!res.data[0].members[0].user.avatar,
+              avatarValue: res.data[0].members[0].user.avatar
+            } : null
+          } : null
         });
         
         // Ensure we always return an array
@@ -84,9 +96,9 @@ export const useProjects = () => {
         throw error;
       }
     },
-    enabled: isAuthenticated && !!user?.userId, // Only run if authenticated and have userId
-    staleTime: 30000, // Consider fresh for 30 seconds
-    gcTime: 300000, // Keep in cache for 5 minutes
+    enabled: isAuthenticated && !!user?.userId,
+    staleTime: 30000,
+    gcTime: 300000,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
@@ -100,12 +112,10 @@ export const useProjects = () => {
     },
     onSuccess: (newProject) => {
       console.log('✅ Project creation successful, updating cache for user:', user?.email);
-      // ✅ FIXED: Update user-specific cache
       queryClient.setQueryData<Project[]>(queryKey, (old) => {
         const currentProjects = Array.isArray(old) ? old : [];
         return [newProject, ...currentProjects];
       });
-      // Also invalidate to ensure fresh data
       queryClient.invalidateQueries({ queryKey });
     },
     onError: (error) => {
@@ -115,20 +125,38 @@ export const useProjects = () => {
 
   const updateProjectMutation = useMutation({
     mutationFn: async ({ projectId, data }: { projectId: string; data: { name?: string; description?: string } }) => {
-      console.log('📝 Updating project:', projectId, data);
+      console.log('📝 Updating project:', projectId, 'with data:', data);
+      
+      // Validate input exists
+      if (!data) {
+        throw new Error('Update data is required');
+      }
+      
+      // Validate at least one field is provided
+      if (!data.name && data.description === undefined) {
+        throw new Error('At least one field must be provided for update');
+      }
+      
+      // Validate name is not empty if provided
+      if (data.name !== undefined && !data.name.trim()) {
+        throw new Error('Project name cannot be empty');
+      }
+
       const res = await API.put(`/projects/${projectId}`, data);
       console.log('✅ Project updated:', res.data);
       return res.data;
     },
     onSuccess: (updatedProject) => {
       console.log('✅ Project update successful, updating cache');
-      // ✅ FIXED: Update user-specific cache
+      // Update the specific project in cache
       queryClient.setQueryData<Project[]>(queryKey, (old) => {
         const currentProjects = Array.isArray(old) ? old : [];
         return currentProjects.map(project => 
           project.id === updatedProject.id ? updatedProject : project
         );
       });
+      // Also invalidate to ensure consistency
+      queryClient.invalidateQueries({ queryKey });
     },
     onError: (error) => {
       console.error('❌ Failed to update project:', error);
@@ -138,16 +166,19 @@ export const useProjects = () => {
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: string) => {
       console.log('🗑️ Deleting project:', projectId);
-      await API.delete(`/projects/${projectId}`);
-      return projectId;
+      const res = await API.delete(`/projects/${projectId}`);
+      console.log('✅ Delete response:', res.data);
+      return { projectId, ...res.data };
     },
-    onSuccess: (deletedProjectId) => {
+    onSuccess: (result) => {
       console.log('✅ Project deletion successful, updating cache');
-      // ✅ FIXED: Update user-specific cache
+      // Remove project from cache
       queryClient.setQueryData<Project[]>(queryKey, (old) => {
         const currentProjects = Array.isArray(old) ? old : [];
-        return currentProjects.filter(p => p.id !== deletedProjectId);
+        return currentProjects.filter(p => p.id !== result.projectId);
       });
+      // Also invalidate to ensure consistency
+      queryClient.invalidateQueries({ queryKey });
     },
     onError: (error) => {
       console.error('❌ Failed to delete project:', error);

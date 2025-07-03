@@ -1,22 +1,23 @@
-// frontend/src/app/calendar/page.tsx - FIXED IMPORTS
+// frontend/src/app/calendar/page.tsx - Updated with Project Guard
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Users, ChevronDown, List, Grid3X3 } from 'lucide-react';
+import { Calendar, ChevronDown, List, Grid3X3 } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { ProjectGuardWrapper } from '@/components/project/ProjectGuardWrapper';
 import CalendarView from '@/components/calendar/CalendarView';
 import MeetingListView from '@/components/calendar/MeetingListView';
 import UpcomingMeetings from '@/components/calendar/UpcomingMeetings';
 import { useProjects } from '@/hooks/useProjects';
 import { useMeetings } from '@/hooks/useMeetings';
 
-export default function CalendarPage() {
+function CalendarContent() {
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
   
   const { projects, isLoading: projectsLoading, error: projectsError } = useProjects();
-  const { userMeetings, getTodaysMeetings, getUpcomingMeetings, isLoading: meetingsLoading } = useMeetings();
+  const { userMeetings, getUpcomingMeetings, isLoading: meetingsLoading } = useMeetings();
   
   // Debug logging
   useEffect(() => {
@@ -40,7 +41,6 @@ export default function CalendarPage() {
     }
   }, [projects, selectedProjectId, projectsLoading]);
 
-  const todaysMeetings = getTodaysMeetings();
   const upcomingMeetings = getUpcomingMeetings(7);
 
   // Show loading state
@@ -179,42 +179,11 @@ export default function CalendarPage() {
 
               {/* Sidebar */}
               <div className="lg:col-span-1 space-y-6">
-                {/* Today's Meetings */}
-                {todaysMeetings.length > 0 && (
-                  <div className="bg-card border border-border rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock className="w-4 h-4 text-primary" />
-                      <h3 className="font-semibold text-card-foreground">Today's Meetings</h3>
-                    </div>
-                    <div className="space-y-2">
-                      {todaysMeetings.slice(0, 3).map(meeting => (
-                        <div key={meeting.id} className="p-2 bg-muted/50 rounded-lg">
-                          <div className="font-medium text-sm text-card-foreground truncate">
-                            {meeting.title}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(meeting.datetime).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                      {todaysMeetings.length > 3 && (
-                        <div className="text-xs text-muted-foreground text-center">
-                          +{todaysMeetings.length - 3} more today
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {/* Upcoming Meetings */}
                 <UpcomingMeetings meetings={upcomingMeetings} />
 
                 {/* Quick Stats */}
-                <div className="bg-card border border-border rounded-lg p-4">
+                <div className="bg-card border border-border rounded-xl p-4">
                   <h3 className="font-semibold text-card-foreground mb-3">This Week</h3>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -238,11 +207,11 @@ export default function CalendarPage() {
 
                 {/* Project Summary */}
                 {projects.length > 0 && (
-                  <div className="bg-card border border-border rounded-lg p-4">
+                  <div className="bg-card border border-border rounded-xl p-4">
                     <h3 className="font-semibold text-card-foreground mb-3">Your Projects</h3>
                     <div className="space-y-2">
                       {projects.slice(0, 3).map(project => (
-                        <div key={project.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50">
+                        <div key={project.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                           <span className="text-sm text-card-foreground truncate">{project.name}</span>
                           <span className="text-xs text-muted-foreground">
                             {project._count?.tasks || 0} tasks
@@ -250,18 +219,41 @@ export default function CalendarPage() {
                         </div>
                       ))}
                       {projects.length > 3 && (
-                        <div className="text-xs text-muted-foreground text-center">
+                        <div className="text-xs text-muted-foreground text-center pt-2">
                           +{projects.length - 3} more projects
                         </div>
                       )}
                     </div>
                   </div>
                 )}
+
+                {/* Meeting Tips */}
+                <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4">
+                  <h3 className="font-semibold text-card-foreground mb-2">💡 Quick Tips</h3>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>• Click on any meeting to view details</li>
+                    <li>• Use filters to focus on specific projects</li>
+                    <li>• Starting soon meetings pulse for attention</li>
+                    <li>• Join meetings directly from calendar cards</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
         </main>
       </div>
     </div>
+  );
+}
+
+export default function CalendarPage() {
+  return (
+    <ProjectGuardWrapper 
+      requireProject={true}
+      fallbackTitle="Create a Project to Schedule Meetings"
+      fallbackDescription="Meetings are organized within projects. Create your first project to start scheduling and managing meetings."
+    >
+      <CalendarContent />
+    </ProjectGuardWrapper>
   );
 }

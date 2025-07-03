@@ -2,9 +2,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, Users, Link2, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react';
+import { Calendar, Clock, Users, Video, MoreVertical, Edit, Trash2, Eye, ExternalLink, Play, Filter } from 'lucide-react';
 import { useMeetings } from '@/hooks/useMeetings';
-import { formatDateTime } from '@/utils/dateUtils';
+import { formatDateTime, getRelativeTimeLabel } from '@/utils/dateUtils';
 import { Meeting } from '@/types/meeting';
 import MeetingDetailModal from './MeetingDetailModal';
 import EditMeetingModal from './EditMeetingModal';
@@ -17,39 +17,69 @@ export default function MeetingListView({ projectId }: MeetingListViewProps) {
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [timeFilter, setTimeFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   
   const { userMeetings, projectMeetings, isLoading, deleteMeeting } = useMeetings(projectId);
   
   const meetings = projectId ? projectMeetings : userMeetings;
   
   const filteredMeetings = meetings.filter(meeting => {
-    const meetingDate = new Date(meeting.datetime);
-    const now = new Date();
-    
-    switch (timeFilter) {
-      case 'upcoming':
-        return meetingDate >= now;
-      case 'past':
-        return meetingDate < now;
-      default:
-        return true;
+    try {
+      const meetingDate = new Date(meeting.datetime);
+      const now = new Date();
+      
+      if (isNaN(meetingDate.getTime())) {
+        console.warn('Invalid meeting date:', meeting.datetime);
+        return false;
+      }
+      
+      switch (timeFilter) {
+        case 'upcoming':
+          return meetingDate >= now;
+        case 'past':
+          return meetingDate < now;
+        default:
+          return true;
+      }
+    } catch (error) {
+      console.error('Error filtering meeting:', error, meeting);
+      return false;
     }
-  }).sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+  }).sort((a, b) => {
+    try {
+      return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
+    } catch (error) {
+      console.error('Error sorting meetings:', error);
+      return 0;
+    }
+  });
 
   const handleDeleteMeeting = async (meetingId: string) => {
     if (confirm('Are you sure you want to delete this meeting?')) {
       try {
         await deleteMeeting(meetingId);
+        setOpenDropdown(null);
       } catch (error) {
         console.error('Failed to delete meeting:', error);
       }
     }
   };
 
+  const joinMeeting = (meetingUrl: string) => {
+    window.open(meetingUrl, '_blank');
+  };
+
   const getAttendeeStatus = (meeting: Meeting) => {
     const acceptedCount = meeting.attendees.filter(a => a.status === 'ACCEPTED').length;
     const totalCount = meeting.attendees.length;
     return { acceptedCount, totalCount };
+  };
+
+  const isStartingSoon = (meeting: Meeting) => {
+    const now = new Date();
+    const meetingTime = new Date(meeting.datetime);
+    const timeDiff = meetingTime.getTime() - now.getTime();
+    return timeDiff > 0 && timeDiff < 15 * 60 * 1000; // 15 minutes
   };
 
   if (isLoading) {
@@ -65,41 +95,42 @@ export default function MeetingListView({ projectId }: MeetingListViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Filter Controls */}
+      {/* Clean Filter Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">Show:</span>
+          <Filter className="w-4 h-4 text-muted-foreground" />
           <div className="flex items-center bg-muted rounded-lg p-0.5">
             {[
-              { key: 'upcoming', label: 'Upcoming' },
-              { key: 'past', label: 'Past' },
-              { key: 'all', label: 'All' }
+              { key: 'upcoming', label: 'Upcoming', count: meetings.filter(m => new Date(m.datetime) >= new Date()).length },
+              { key: 'past', label: 'Past', count: meetings.filter(m => new Date(m.datetime) < new Date()).length },
+              { key: 'all', label: 'All', count: meetings.length }
             ].map(filter => (
               <button
                 key={filter.key}
                 onClick={() => setTimeFilter(filter.key as any)}
-                className={`px-3 py-1 text-xs rounded transition-colors ${
+                className={`px-3 py-1.5 text-sm rounded-md transition-all duration-200 flex items-center gap-2 ${
                   timeFilter === filter.key
-                    ? 'bg-background shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-background shadow-sm text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
                 }`}
               >
                 {filter.label}
+                <span className="text-xs bg-muted-foreground/10 px-1.5 py-0.5 rounded">
+                  {filter.count}
+                </span>
               </button>
             ))}
           </div>
         </div>
-        
-        <div className="text-sm text-muted-foreground">
-          {filteredMeetings.length} meetings
-        </div>
       </div>
 
-      {/* Meetings List */}
+      {/* Clean Meeting List */}
       {filteredMeetings.length === 0 ? (
-        <div className="text-center py-12">
-          <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">No meetings found</h3>
+        <div className="text-center py-16">
+          <div className="w-16 h-16 bg-muted/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Calendar className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-2">No meetings found</h3>
           <p className="text-muted-foreground">
             {timeFilter === 'upcoming' 
               ? 'No upcoming meetings scheduled' 
@@ -114,122 +145,185 @@ export default function MeetingListView({ projectId }: MeetingListViewProps) {
           {filteredMeetings.map(meeting => {
             const { acceptedCount, totalCount } = getAttendeeStatus(meeting);
             const isPast = new Date(meeting.datetime) < new Date();
+            const startingSoon = isStartingSoon(meeting);
             
             return (
               <div
                 key={meeting.id}
-                className={`bg-card border border-border rounded-lg p-4 hover:shadow-md transition-shadow ${
-                  isPast ? 'opacity-75' : ''
+                className={`group bg-card border rounded-xl p-5 transition-all duration-200 hover:shadow-md ${
+                  isPast 
+                    ? 'border-border/50 opacity-60' 
+                    : startingSoon 
+                    ? 'border-primary/30 bg-primary/[0.02] ring-1 ring-primary/10' 
+                    : 'border-border hover:border-primary/20'
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        isPast ? 'bg-muted' : 'bg-primary/10'
-                      }`}>
-                        <Calendar className={`w-5 h-5 ${isPast ? 'text-muted-foreground' : 'text-primary'}`} />
+                <div className="flex items-start gap-4">
+                  {/* Clean Time Display */}
+                  <div className="flex flex-col items-center min-w-[90px]">
+                    <div className={`w-16 h-16 rounded-xl border-2 flex flex-col items-center justify-center ${
+                      isPast 
+                        ? 'border-border bg-muted/30' 
+                        : startingSoon 
+                        ? 'border-primary bg-primary/10' 
+                        : 'border-primary/30 bg-primary/5'
+                    }`}>
+                      <div className={`text-sm font-bold ${isPast ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {new Date(meeting.datetime).toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          hour12: true
+                        })}
                       </div>
-                      
+                      <div className={`text-xs ${isPast ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                        {new Date(meeting.datetime).toLocaleTimeString('en-US', {
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2 text-center font-medium">
+                      {getRelativeTimeLabel(new Date(meeting.datetime))}
+                    </div>
+                    {startingSoon && (
+                      <div className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full mt-1 font-medium">
+                        Soon
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Meeting Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-card-foreground mb-1 truncate">
+                        <h3 className="text-lg font-semibold text-card-foreground mb-2 truncate">
                           {meeting.title}
                         </h3>
-                        
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatDateTime(meeting.datetime)}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
                             <span>{meeting.duration} min</span>
                           </div>
-                        </div>
-                        
-                        {meeting.project && (
-                          <div className="text-xs text-muted-foreground mb-2">
-                            {meeting.project.name}
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          {meeting.location && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              <span className="truncate max-w-[120px]">{meeting.location}</span>
-                            </div>
-                          )}
-                          
-                          {meeting.meetingUrl && (
-                            <div className="flex items-center gap-1">
-                              <Link2 className="w-3 h-3" />
-                              <span>Virtual</span>
-                            </div>
-                          )}
-                          
                           <div className="flex items-center gap-1">
-                            <Users className="w-3 h-3" />
+                            <Users className="w-4 h-4" />
                             <span>{acceptedCount}/{totalCount} attending</span>
                           </div>
+                          {meeting.project && (
+                            <span className="bg-muted px-2 py-1 rounded text-xs">
+                              {meeting.project.name}
+                            </span>
+                          )}
                         </div>
-                        
-                        {meeting.description && (
-                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                            {meeting.description}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 ml-4">
-                    {/* Attendee Avatars */}
-                    <div className="flex -space-x-2">
-                      {meeting.attendees.slice(0, 3).map(attendee => (
-                        <div
-                          key={attendee.id}
-                          className={`w-8 h-8 rounded-full ${attendee.user.color} border-2 border-background flex items-center justify-center text-white text-xs font-semibold`}
-                          title={`${attendee.user.name || attendee.user.email} (${attendee.status})`}
-                        >
-                          {attendee.user.avatar}
+                      
+                      <div className="flex items-center gap-2 ml-4">
+                        {meeting.meetingUrl && !isPast && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              joinMeeting(meeting.meetingUrl!);
+                            }}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                              startingSoon
+                                ? 'bg-primary text-primary-foreground shadow-lg hover:shadow-xl'
+                                : 'bg-primary/10 text-primary hover:bg-primary/20'
+                            }`}
+                          >
+                            {startingSoon ? <Play className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                            Join
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        )}
+                        
+                        {/* Dropdown Menu */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdown(openDropdown === meeting.id ? null : meeting.id);
+                            }}
+                            className="w-10 h-10 rounded-lg hover:bg-accent flex items-center justify-center transition-colors"
+                          >
+                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                          
+                          {openDropdown === meeting.id && (
+                            <>
+                              <div 
+                                className="fixed inset-0 z-10" 
+                                onClick={() => setOpenDropdown(null)}
+                              />
+                              <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg z-20 min-w-[140px] py-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedMeeting(meeting);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-3 transition-colors"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  View Details
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingMeeting(meeting);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-3 transition-colors"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMeeting(meeting.id);
+                                  }}
+                                  className="w-full px-3 py-2 text-sm text-left hover:bg-accent text-destructive flex items-center gap-3 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
-                      ))}
-                      {meeting.attendees.length > 3 && (
-                        <div className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground">
-                          +{meeting.attendees.length - 3}
-                        </div>
-                      )}
+                      </div>
                     </div>
                     
-                    {/* Actions Menu */}
-                    <div className="relative group">
-                      <button className="w-8 h-8 rounded-lg hover:bg-accent flex items-center justify-center transition-colors">
-                        <MoreHorizontal className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
-                      </button>
-                      
-                      <div className="hidden group-hover:block absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg z-10 min-w-[120px]">
-                        <button
-                          onClick={() => setSelectedMeeting(meeting)}
-                          className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
-                        >
-                          <Eye className="w-3 h-3" />
-                          View Details
-                        </button>
-                        <button
-                          onClick={() => setEditingMeeting(meeting)}
-                          className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
-                        >
-                          <Edit className="w-3 h-3" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteMeeting(meeting.id)}
-                          className="w-full px-3 py-2 text-sm text-left hover:bg-accent text-destructive flex items-center gap-2"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Delete
-                        </button>
+                    {meeting.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                        {meeting.description}
+                      </p>
+                    )}
+
+                    {/* Attendees and Details */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex -space-x-2">
+                          {meeting.attendees.slice(0, 4).map(attendee => (
+                            <div
+                              key={attendee.id}
+                              className={`w-8 h-8 rounded-full ${attendee.user.color} border-2 border-background flex items-center justify-center text-white text-xs font-semibold`}
+                              title={`${attendee.user.name || attendee.user.email} (${attendee.status})`}
+                            >
+                              {attendee.user.avatar}
+                            </div>
+                          ))}
+                          {meeting.attendees.length > 4 && (
+                            <div className="w-8 h-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium text-muted-foreground">
+                              +{meeting.attendees.length - 4}
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      
+                      <button
+                        onClick={() => setSelectedMeeting(meeting)}
+                        className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+                      >
+                        View Details →
+                      </button>
                     </div>
                   </div>
                 </div>
