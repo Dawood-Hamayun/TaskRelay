@@ -1,4 +1,4 @@
-// frontend/src/components/TaskDetailPanel.tsx - COMPLETE VERSION
+// frontend/src/components/TaskDetailPanel.tsx - Enhanced with dynamic members
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,6 +21,7 @@ import { Task, TaskPriority, TaskStatus } from '@/types/task';
 import { useSubtasks } from '@/hooks/useSubtasks';
 import { useComments } from '@/hooks/useComments';
 import { useTaskTags } from '@/hooks/useTaskTags';
+import { useMembers, Member } from '@/hooks/useMembers';
 import { TagSelector } from '@/components/TagSelector';
 import { useTheme } from 'next-themes';
 
@@ -39,13 +40,6 @@ const STATUS_OPTIONS = [
   { value: 'BACKLOG' as TaskStatus, label: 'Backlog', color: 'text-gray-600 dark:text-gray-400' }
 ];
 
-const HARDCODED_MEMBERS = [
-  { id: 'member-1', user: { id: 'user-1', name: 'John Doe', email: 'john@example.com' } },
-  { id: 'member-2', user: { id: 'user-2', name: 'Jane Smith', email: 'jane@example.com' } },
-  { id: 'member-3', user: { id: 'user-3', name: 'Mike Wilson', email: 'mike@example.com' } },
-  { id: 'member-4', user: { id: 'user-4', name: 'Sarah Davis', email: 'sarah@example.com' } },
-];
-
 const TAG_COLORS: Record<string, { light: string; dark: string }> = {
   blue: { light: 'bg-blue-600 text-white border-blue-600', dark: 'bg-blue-500 text-white border-blue-500' },
   purple: { light: 'bg-purple-600 text-white border-purple-600', dark: 'bg-purple-500 text-white border-purple-500' },
@@ -54,6 +48,16 @@ const TAG_COLORS: Record<string, { light: string; dark: string }> = {
   amber: { light: 'bg-amber-600 text-white border-amber-600', dark: 'bg-amber-500 text-white border-amber-500' },
   orange: { light: 'bg-orange-600 text-white border-orange-600', dark: 'bg-orange-500 text-white border-orange-500' },
 };
+
+interface CommentItem {
+  id: string;
+  content: string;
+  createdAt: string;
+  author: {
+    name?: string;
+    email: string;
+  };
+}
 
 interface TaskDetailPanelProps {
   task: Task | null;
@@ -77,6 +81,9 @@ export function TaskDetailPanel({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isEditingTags, setIsEditingTags] = useState(false);
   const { theme } = useTheme();
+
+  // Get dynamic members for the project
+  const { members, isLoading: isLoadingMembers } = useMembers(task?.projectId);
 
   const { 
     comments, 
@@ -112,6 +119,15 @@ export function TaskDetailPanel({
   }, [task]);
 
   if (!task) return null;
+
+  console.log('🎯 TaskDetailPanel render:', {
+    taskId: task.id,
+    projectId: task.projectId,
+    membersCount: members.length,
+    members: members.map(m => ({ id: m.id, name: m.user.name, email: m.user.email })),
+    currentAssignee: task.assignee,
+    isLoadingMembers
+  });
 
   const formatDateForInput = (dateString: string) => {
     const date = new Date(dateString);
@@ -390,7 +406,7 @@ export function TaskDetailPanel({
 
               {/* Details Grid */}
               <div className="grid grid-cols-2 gap-6">
-                {/* Assignee */}
+                {/* Assignee - Dynamic */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-card-foreground">
                     Assignee
@@ -413,7 +429,7 @@ export function TaskDetailPanel({
                             <span>Unassigned</span>
                           </div>
                         </SelectItem>
-                        {HARDCODED_MEMBERS.map(member => (
+                        {members.map(member => (
                           <SelectItem key={member.id} value={member.id}>
                             <div className="flex items-center gap-2">
                               <div className="w-5 h-5 rounded-full bg-zinc-600 flex items-center justify-center text-white text-xs font-medium">
@@ -581,7 +597,7 @@ export function TaskDetailPanel({
                           <span className="text-xs">None</span>
                         </div>
                       </SelectItem>
-                      {HARDCODED_MEMBERS.map(member => (
+                      {members.map(member => (
                         <SelectItem key={member.id} value={member.id}>
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-zinc-600 flex items-center justify-center text-white text-xs font-medium">
@@ -697,7 +713,7 @@ export function TaskDetailPanel({
                 </h3>
                 
                 <div className="space-y-4">
-                  {comments.map(comment => (
+                  {comments.map((comment: CommentItem) => (
                     <div key={comment.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg group">
                       <div className="w-6 h-6 rounded-full bg-zinc-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
                         {comment.author.name?.charAt(0) || comment.author.email.charAt(0)}

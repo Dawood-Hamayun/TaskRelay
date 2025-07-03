@@ -1,22 +1,38 @@
-// 5. frontend/src/components/tasks/TaskCard.tsx - Updated with tag display
+// frontend/src/components/tasks/TaskCard.tsx - Enhanced with dynamic members
+'use client';
+
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Task } from '@/types/task';
-import { UserAvatar } from '@/components/common/UserAvatar';
+import { UserAvatar } from '@/components/userAvatar';
 import { 
   MoreHorizontal, 
   Clock, 
   MessageSquare, 
   Paperclip,
-  Tag as TagIcon
+  Tag as TagIcon,
+  Edit,
+  User,
+  Trash2,
+  Copy,
+  Eye
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 interface TaskCardProps {
   task: Task;
   onClick: (task: Task) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
+  onDuplicate?: (task: Task) => void;
   className?: string;
+}
+
+export interface UserAvatarProps {
+  user: { id: string; name?: string; email: string; avatar?: string } | null;
+  size?: 'sm' | 'md' | 'lg';
 }
 
 const priorityConfig = {
@@ -81,10 +97,18 @@ const isOverdue = (dueDate: string | null) => {
   return new Date(dueDate) < new Date();
 };
 
-export function TaskCard({ task, onClick, className = '' }: TaskCardProps) {
+export function TaskCard({ 
+  task, 
+  onClick, 
+  onEdit, 
+  onDelete, 
+  onDuplicate, 
+  className = '' 
+}: TaskCardProps) {
   const { theme } = useTheme();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isDark = theme === 'dark';
-  const overdue = isOverdue(task.dueDate);
+  const overdue = isOverdue(task.dueDate ?? null);
   const priorityInfo = priorityConfig[task.priority];
 
   // Calculate subtask progress
@@ -95,16 +119,43 @@ export function TaskCard({ task, onClick, className = '' }: TaskCardProps) {
 
   // Get task tags - only show assigned tags
   const taskTags = task.tags || [];
-  const displayTags = taskTags.slice(0, 3); // Show max 3 tags
-  const remainingTagsCount = Math.max(0, taskTags.length - 3);
+  const displayTags = taskTags.slice(0, 2); // Show max 2 tags
+  const remainingTagsCount = Math.max(0, taskTags.length - 2);
+
+  const handleMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleMenuAction = (action: 'edit' | 'delete' | 'duplicate' | 'view', e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMenuOpen(false);
+    
+    switch (action) {
+      case 'edit':
+        onEdit?.(task);
+        break;
+      case 'delete':
+        onDelete?.(task);
+        break;
+      case 'duplicate':
+        onDuplicate?.(task);
+        break;
+      case 'view':
+        onClick(task);
+        break;
+    }
+  };
 
   return (
     <Card 
-      className={`group hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer border shadow-sm ${isDark ? 'glass-card' : 'bg-white border-border'} ${className}`}
+      className={`group hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer border shadow-sm relative ${
+        isDark ? 'bg-card border-border' : 'bg-white border-border'
+      } ${className}`}
       onClick={() => onClick(task)}
     >
       <CardContent className="p-4">
-        {/* Header with Priority Indicator */}
+        {/* Header with Priority and Menu */}
         <div className="flex items-start gap-3 mb-3">
           <div className={`w-1.5 h-1.5 rounded-full mt-2 ${priorityInfo.dot} shrink-0`} />
           <div className="flex-1 min-w-0">
@@ -117,17 +168,64 @@ export function TaskCard({ task, onClick, className = '' }: TaskCardProps) {
               </p>
             )}
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle task menu actions
-            }}
-          >
-            <MoreHorizontal className="h-3 w-3" />
-          </Button>
+          
+          {/* Menu Button */}
+          <div className="relative shrink-0">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={handleMenuClick}
+            >
+              <MoreHorizontal className="h-3 w-3" />
+            </Button>
+            
+            {/* Dropdown Menu */}
+            {isMenuOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setIsMenuOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg z-20 min-w-[140px] py-1">
+                  <button
+                    onClick={(e) => handleMenuAction('view', e)}
+                    className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-3 transition-colors"
+                  >
+                    <Eye className="w-3 h-3" />
+                    View Details
+                  </button>
+                  {onEdit && (
+                    <button
+                      onClick={(e) => handleMenuAction('edit', e)}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-3 transition-colors"
+                    >
+                      <Edit className="w-3 h-3" />
+                      Edit Task
+                    </button>
+                  )}
+                  {onDuplicate && (
+                    <button
+                      onClick={(e) => handleMenuAction('duplicate', e)}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-3 transition-colors"
+                    >
+                      <Copy className="w-3 h-3" />
+                      Duplicate
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      onClick={(e) => handleMenuAction('delete', e)}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-accent text-destructive flex items-center gap-3 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Tags - Show assigned tags only */}
@@ -144,7 +242,7 @@ export function TaskCard({ task, onClick, className = '' }: TaskCardProps) {
             ))}
             {remainingTagsCount > 0 && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
-                +{remainingTagsCount} more
+                +{remainingTagsCount}
               </span>
             )}
           </div>
@@ -190,12 +288,16 @@ export function TaskCard({ task, onClick, className = '' }: TaskCardProps) {
             )}
           </div>
 
-          {/* Assignee */}
-          <UserAvatar 
-            user={task.assignee?.user} 
-            size="sm"
-          />
-        </div>
+          {/* Assignee */} 
+          {task.assignee?.user ? (
+            <UserAvatar user={task.assignee.user} size="sm" />
+          ) : (
+            /* small gray placeholder when there is no assignee */
+            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
+              <User className="h-3 w-3 text-muted-foreground" />
+            </div>
+          )}
+         </div>
       </CardContent>
     </Card>
   );

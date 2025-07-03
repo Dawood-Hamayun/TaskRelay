@@ -8,7 +8,11 @@ import { useQueryClient } from '@tanstack/react-query';
 
 interface User {
   userId: string;
+  avatar?: string;     // ← optional
+  color?: string;      // ← optional
   email: string;
+  name?: string;
+
 }
 
 interface AuthContextType {

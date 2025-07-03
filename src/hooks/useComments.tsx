@@ -2,7 +2,6 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { Comment } from '@/types/task';
 
 interface CreateCommentData {

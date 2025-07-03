@@ -2,10 +2,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, MapPin, Link2, Users, Save, Loader2 } from 'lucide-react';
+import { X, Calendar, Clock, Link2, Users, Save, Loader2, ChevronDown } from 'lucide-react';
 import { Meeting, UpdateMeetingDto } from '@/types/meeting';
 import { useMeetings } from '@/hooks/useMeetings';
-import { formatDateTimeForInput } from '@/utils/dateUtils';
+import { Button } from '@/components/ui/button';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface EditMeetingModalProps {
   meeting: Meeting | null;
@@ -13,20 +17,40 @@ interface EditMeetingModalProps {
   onClose: () => void;
 }
 
+const DURATION_OPTIONS = [
+  { value: 15, label: '15 min' },
+  { value: 30, label: '30 min' },
+  { value: 45, label: '45 min' },
+  { value: 60, label: '1 hour' },
+  { value: 90, label: '1.5 hours' },
+  { value: 120, label: '2 hours' },
+];
+
 export default function EditMeetingModal({ meeting, isOpen, onClose }: EditMeetingModalProps) {
-  const [formData, setFormData] = useState<UpdateMeetingDto>({});
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    date: new Date(),
+    time: '10:00',
+    duration: 60,
+    meetingUrl: ''
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   
   const { updateMeeting, isUpdating } = useMeetings();
 
   useEffect(() => {
     if (meeting && isOpen) {
+      const meetingDate = new Date(meeting.datetime);
+      const timeString = `${String(meetingDate.getHours()).padStart(2, '0')}:${String(meetingDate.getMinutes()).padStart(2, '0')}`;
+      
       setFormData({
         title: meeting.title,
         description: meeting.description || '',
-        datetime: formatDateTimeForInput(new Date(meeting.datetime)),
+        date: meetingDate,
+        time: timeString,
         duration: meeting.duration,
-        location: meeting.location || '',
         meetingUrl: meeting.meetingUrl || ''
       });
       setErrors({});
@@ -42,17 +66,16 @@ export default function EditMeetingModal({ meeting, isOpen, onClose }: EditMeeti
       newErrors.title = 'Meeting title is required';
     }
     
-    if (!formData.datetime) {
-      newErrors.datetime = 'Date and time are required';
+    if (!formData.date) {
+      newErrors.date = 'Date is required';
     } else {
-      const meetingDate = new Date(formData.datetime);
-      if (meetingDate < new Date()) {
+      const [hours, minutes] = formData.time.split(':').map(Number);
+      const meetingDateTime = new Date(formData.date);
+      meetingDateTime.setHours(hours, minutes, 0, 0);
+      
+      if (meetingDateTime < new Date()) {
         newErrors.datetime = 'Meeting cannot be scheduled in the past';
       }
-    }
-    
-    if (formData.duration && (formData.duration < 15 || formData.duration > 480)) {
-      newErrors.duration = 'Duration must be between 15 minutes and 8 hours';
     }
     
     setErrors(newErrors);
@@ -65,12 +88,17 @@ export default function EditMeetingModal({ meeting, isOpen, onClose }: EditMeeti
     if (!validateForm()) return;
     
     try {
+      const [hours, minutes] = formData.time.split(':').map(Number);
+      const meetingDateTime = new Date(formData.date);
+      meetingDateTime.setHours(hours, minutes, 0, 0);
+      
       await updateMeeting({
         meetingId: meeting.id,
         data: {
-          ...formData,
+          title: formData.title,
           description: formData.description || undefined,
-          location: formData.location || undefined,
+          datetime: meetingDateTime.toISOString(),
+          duration: formData.duration,
           meetingUrl: formData.meetingUrl || undefined
         }
       });
@@ -114,7 +142,7 @@ export default function EditMeetingModal({ meeting, isOpen, onClose }: EditMeeti
             </label>
             <input
               type="text"
-              value={formData.title || ''}
+              value={formData.title}
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               placeholder="Enter meeting title"
               className={`w-full h-10 px-3 text-sm bg-input border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
@@ -127,65 +155,83 @@ export default function EditMeetingModal({ meeting, isOpen, onClose }: EditMeeti
           </div>
 
           {/* Date & Time + Duration */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-card-foreground">
-                Date & Time *
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="datetime-local"
-                  value={formData.datetime || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, datetime: e.target.value }))}
-                  className={`w-full h-10 pl-10 pr-3 text-sm bg-input border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring ${
-                    errors.datetime ? 'border-destructive' : 'border-border'
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-card-foreground">When & How Long</h3>
+            
+            <div className="flex gap-4">
+              <div className="flex flex-col gap-3">
+                <Label htmlFor="date-picker" className="px-1">
+                  Date
+                </Label>
+                <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      id="date-picker"
+                      className={`w-32 justify-between font-normal ${
+                        errors.date ? 'border-destructive' : ''
+                      }`}
+                    >
+                      {formData.date ? formData.date.toLocaleDateString() : "Select date"}
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={formData.date}
+                      captionLayout="dropdown"
+                      onSelect={(date) => {
+                        if (date) {
+                          setFormData(prev => ({ ...prev, date }));
+                          setIsDatePickerOpen(false);
+                        }
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+                {errors.date && (
+                  <p className="text-xs text-destructive">{errors.date}</p>
+                )}
+              </div>
+              
+              <div className="flex flex-col gap-3">
+                <Label htmlFor="time-picker" className="px-1">
+                  Time
+                </Label>
+                <Input
+                  type="time"
+                  id="time-picker"
+                  value={formData.time}
+                  onChange={(e) => setFormData(prev => ({ ...prev, time: e.target.value }))}
+                  className={`bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none ${
+                    errors.datetime ? 'border-destructive' : ''
                   }`}
                 />
+                {errors.datetime && (
+                  <p className="text-xs text-destructive">{errors.datetime}</p>
+                )}
               </div>
-              {errors.datetime && (
-                <p className="text-xs text-destructive">{errors.datetime}</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-card-foreground">
-                Duration (minutes)
-              </label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <select
-                  value={formData.duration || 60}
-                  onChange={(e) => setFormData(prev => ({ ...prev, duration: Number(e.target.value) }))}
-                  className="w-full h-10 pl-10 pr-3 text-sm bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
-                >
-                  <option value={15}>15 minutes</option>
-                  <option value={30}>30 minutes</option>
-                  <option value={45}>45 minutes</option>
-                  <option value={60}>1 hour</option>
-                  <option value={90}>1.5 hours</option>
-                  <option value={120}>2 hours</option>
-                  <option value={180}>3 hours</option>
-                  <option value={240}>4 hours</option>
-                </select>
+              
+              <div className="flex flex-col gap-3">
+                <Label className="px-1">Duration</Label>
+                <div className="grid grid-cols-2 gap-2 w-32">
+                  {DURATION_OPTIONS.slice(0, 4).map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, duration: option.value }))}
+                      className={`h-10 text-xs rounded-lg border transition-all ${
+                        formData.duration === option.value
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-input border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Location */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-card-foreground">
-              Location
-            </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                value={formData.location || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                placeholder="Meeting room, address, or location"
-                className="w-full h-10 pl-10 pr-3 text-sm bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
-              />
             </div>
           </div>
 
@@ -198,7 +244,7 @@ export default function EditMeetingModal({ meeting, isOpen, onClose }: EditMeeti
               <Link2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="url"
-                value={formData.meetingUrl || ''}
+                value={formData.meetingUrl}
                 onChange={(e) => setFormData(prev => ({ ...prev, meetingUrl: e.target.value }))}
                 placeholder="https://zoom.us/j/... or Google Meet link"
                 className="w-full h-10 pl-10 pr-3 text-sm bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-ring"
@@ -212,7 +258,7 @@ export default function EditMeetingModal({ meeting, isOpen, onClose }: EditMeeti
               Description
             </label>
             <textarea
-              value={formData.description || ''}
+              value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Meeting agenda, notes, or additional details..."
               rows={3}
@@ -244,14 +290,11 @@ export default function EditMeetingModal({ meeting, isOpen, onClose }: EditMeeti
                 </div>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Note: Attendee management will be added in a future update
-            </p>
           </div>
         </form>
 
         {/* Footer */}
-        <div className="p-6 border-t border-border bg-muted/20">
+        <div className="p-6 border-t border-border">
           <div className="flex items-center justify-end gap-3">
             <button
               type="button"

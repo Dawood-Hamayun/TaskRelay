@@ -60,6 +60,12 @@ const TAG_COLORS = [
   },
 ];
 
+interface TagItem {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface TagSelectorProps {
   projectId: string;
   selectedTags?: string[];
@@ -174,7 +180,7 @@ export function TagSelector({ projectId, selectedTags = [], onTagsChange }: TagS
         {tags.length === 0 ? (
           <p className="text-sm text-muted-foreground">No tags created yet</p>
         ) : (
-          tags.map(tag => {
+          tags.map((tag: TagItem) => {
             const isSelected = selectedTags.includes(tag.id);
             return (
               <button

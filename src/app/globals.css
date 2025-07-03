@@ -153,3 +153,215 @@
 .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
 .text-2xl { font-size: 1.5rem; line-height: 2rem; }
 .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+
+/* Add these styles to your globals.css file */
+
+/* Enhanced meeting animations */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.005);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+/* Glassmorphic effects for meeting cards */
+.meeting-card-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .meeting-card-glass {
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(64, 64, 64, 0.3);
+}
+
+/* Enhanced hover effects */
+.meeting-card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meeting-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.dark .meeting-card-hover:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+/* Better border utilities */
+.border-3 {
+  border-width: 3px;
+}
+
+/* Enhanced gradient backgrounds */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.1) 0%, hsl(var(--primary) / 0.05) 100%);
+}
+
+.bg-gradient-primary-hover {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.15) 0%, hsl(var(--primary) / 0.08) 100%);
+}
+
+/* Meeting time badge styles */
+.time-badge {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.1) 0%, hsl(var(--primary) / 0.05) 100%);
+  border: 2px solid hsl(var(--primary) / 0.2);
+  transition: all 0.3s ease;
+}
+
+.time-badge-starting {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.2) 0%, hsl(var(--primary) / 0.1) 100%);
+  border: 2px solid hsl(var(--primary) / 0.4);
+  box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+}
+
+/* Enhanced scroll behavior */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Meeting list specific styles */
+.meeting-list-container {
+  scroll-snap-type: y mandatory;
+}
+
+.meeting-list-item {
+  scroll-snap-align: start;
+}
+
+/* Better focus states */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background;
+}
+
+/* Enhanced typography for meetings */
+.meeting-title {
+  font-variation-settings: 'wght' 700;
+  letter-spacing: -0.02em;
+}
+
+.meeting-subtitle {
+  font-variation-settings: 'wght' 500;
+  letter-spacing: -0.01em;
+}
+
+/* Custom scrollbar for meeting lists */
+.meeting-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.meeting-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+.meeting-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.meeting-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.5);
+}
+
+/* Enhanced filter button styles */
+.filter-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.filter-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.filter-button:hover::before {
+  left: 100%;
+}
+
+/* Meeting card pattern background */
+.meeting-pattern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.1) 1px, transparent 1px);
+  background-size: 10px 10px;
+  opacity: 0.3;
+}
+
+/* Responsive design utilities */
+@media (max-width: 768px) {
+  .meeting-card-mobile {
+    padding: 1rem;
+    border-radius: 1.5rem;
+  }
+  
+  .meeting-time-mobile {
+    width: 60px;
+    height: 60px;
+    font-size: 0.875rem;
+  }
+}
+
+/* Dark mode enhancements */
+.dark .meeting-card-dark {
+  background: linear-gradient(135deg, 
+    rgba(26, 26, 26, 0.9) 0%, 
+    rgba(40, 40, 40, 0.9) 50%, 
+    rgba(26, 26, 26, 0.9) 100%
+  );
+  border: 1px solid rgba(64, 64, 64, 0.3);
+}
+
+.dark .meeting-card-dark:hover {
+  background: linear-gradient(135deg, 
+    rgba(30, 30, 30, 0.95) 0%, 
+    rgba(45, 45, 45, 0.95) 50%, 
+    rgba(30, 30, 30, 0.95) 100%
+  );
+  border: 1px solid rgba(80, 80, 80, 0.5);
+}
+
+
+// Add to globals.css
+/* Page transition styles */
+.page-transition {
+  transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better loading states */
+.loading-fade {
+  animation: loadingFade 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingFade {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}

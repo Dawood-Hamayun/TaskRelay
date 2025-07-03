@@ -104,8 +104,10 @@ export default function InviteAcceptancePage() {
       
       // Check if the authenticated user's email matches the invite
       if (invite?.email && user?.email !== invite.email) {
-        setError(`This invite is for ${invite.email}, but you're signed in as ${user.email}. Please sign in with the correct account or ask for a new invite.`);
-        return;
+          setError(
+            `This invite is for ${invite.email}, but you're signed in as ${user?.email ?? 'unknown account'}. ` +
+            'Please sign in with the correct account or ask for a new invite.'
+          );
       }
       
       // Accept the invite
